@@ -10,6 +10,8 @@ Claude Code session is doing.
 - One cat per open Claude Code session, each with its own coat.
 - One kitten per running subagent, in a color of its own.
 - A speech bubble shows the project and the current action.
+- A separate cat watches the Claude Code usage limits (see
+  [The usage cat](#the-usage-cat)).
 
 ## What the cat does
 
@@ -34,6 +36,45 @@ while delegating to an agent, light grey while thinking.
 - Right click: send the cat home, dismiss that cat, or quit the program.
 
 Clicks pass through everything that is transparent around the cat.
+
+## The usage cat
+
+One more cat, at the bottom left of the screen, tracks the usage limits of the
+account: the same figures as the Usage tab of `/config`.
+
+![The usage cat at each level](usage.png)
+
+- Thick gauge: the current session (5-hour window), with its percentage.
+- Thin gauge: the week (7 days).
+- The bubble gives both percentages and the time of the next reset. It opens
+  on hover, on click, or by itself when a threshold is crossed.
+
+| Usage (session or week) | What the cat does |
+|---|---|
+| Below 50% | Sits, green gauge; types on its laptop while Claude is consuming |
+| 50% and above | The same, yellow gauge |
+| 80% and above | Meows, orange exclamation mark |
+| 95% and above | Meows faster, in red |
+| 100% | Sleeps until the reset; the bubble gives the time it comes back |
+| Reset of a nearly reached limit | Jumps for joy for 30 seconds |
+
+The cat follows the clock: once the reset time has passed, the gauge goes back
+to zero even if Claude Code has sent nothing since.
+
+Mouse: hover or left click for the bubble, drag to move it (its spot is
+remembered), right click to send it home or quit the program.
+
+The figures come through the Claude Code status line, which also shows a
+summary:
+
+```
+🐱 Session 42% ↻ 14:00 · Week 12%
+```
+
+Usage limits only exist with a Claude subscription (Pro, Max, Team), not with
+an API key. No network call, no access to credentials: everything comes from
+what Claude Code hands to the status line. The texts are in French by default;
+set `"lang": "en"` for English.
 
 ## Requirements
 
@@ -68,6 +109,10 @@ is already there, and copies the file to
 `~/.claude/settings.json.backup-we-always-need-cats` first. The cats show up on
 the next Claude Code event.
 
+It also registers the status line of the usage cat. A status line that is
+already set is kept and the usage cat is not installed; `--force` replaces it.
+`--no-usage` installs the session cats only.
+
 To install them for a single project instead:
 
 ```bash
@@ -87,7 +132,15 @@ next event.
   "follow_after_done": 30,
   "sleep_delay": 180,
   "speed": 800,
-  "log": false
+  "log": false,
+  "lang": "fr",
+  "coat": "ginger",
+  "warn": 50,
+  "alert": 80,
+  "critical": 95,
+  "notify_seconds": 12,
+  "keep_alive": false,
+  "statusline": true
 }
 ```
 
@@ -99,6 +152,16 @@ next event.
 - `log`: write the received events to
   `~/.cache/we-always-need-cats/cats.log`.
 
+For the usage cat (which also follows `scale`):
+
+- `lang`: language of the bubble and of the status line, `fr` or `en`.
+- `coat`: `ginger`, `grey`, `black`, `cream`, `brown` or `blue`.
+- `warn`, `alert`, `critical`: thresholds, in percent.
+- `notify_seconds`: how long the bubble stays open when a threshold is crossed.
+- `keep_alive`: `true` to keep the cat after Claude Code is closed (handy while
+  waiting for a reset). Otherwise it leaves with the last session.
+- `statusline`: `false` to print nothing in the status line.
+
 ## How it works
 
 - `hook.py` is called by Claude Code on every event (hooks declared in
@@ -109,7 +172,13 @@ next event.
 - `kwin_cursor.js` is a KWin script loaded by `cats.py`. Under Wayland an
   application cannot read the mouse position: KWin reports it.
 - `sprites.py` holds the drawings and the colors.
-- `install.py` registers and removes the hooks.
+- `usage_statusline.py` is called by Claude Code at every status line refresh.
+  It receives the limits of the account (`rate_limits`), saves them to
+  `~/.cache/usage-cat/state.json`, starts `usage_cat.py` if it is not running,
+  and prints the summary.
+- `usage_cat.py` shows the usage cat and reads that file again every second;
+  `usage_common.py` holds its settings, thresholds and texts.
+- `install.py` registers and removes the hooks and the status line.
 
 ## Editing the drawings
 
@@ -129,6 +198,10 @@ writes a sheet of every sprite to check the result.
 ```bash
 python3 demo.py            # full scenario, about 40 seconds
 python3 demo.py question   # a single state: idle, work, agents, question, done, end
+
+python3 usage_demo.py      # usage cat: full scenario, about 50 seconds
+python3 usage_demo.py 85   # a single percentage, until Ctrl+C
+python3 usage_cat.py --preview usage.png   # sheet of all its states
 ```
 
 ## Uninstall
@@ -138,7 +211,7 @@ python3 install.py --uninstall
 ```
 
 If you move this folder, run `python3 install.py` again from the new location:
-the hooks hold the full path of `hook.py`.
+the hooks and the status line hold the full path of the scripts.
 
 ## License
 

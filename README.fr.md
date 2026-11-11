@@ -11,6 +11,8 @@ montre ce que fait chaque session Claude Code.
 - Un chaton par sous-agent en cours d'exécution, d'une couleur propre à chaque
   type d'agent.
 - Une bulle indique le projet et l'action en cours.
+- Un chat à part surveille les limites d'usage de Claude Code (voir
+  [Le chat d'usage](#le-chat-dusage)).
 
 ## Ce que fait le chat
 
@@ -36,6 +38,46 @@ pour le web, rose quand il délègue à un agent, gris clair quand il réfléchi
   programme.
 
 Les clics traversent tout ce qui est transparent autour du chat.
+
+## Le chat d'usage
+
+Un chat de plus, en bas à gauche de l'écran, suit les limites d'usage du
+compte : les mêmes chiffres que l'onglet Usage de `/config`.
+
+![Le chat d'usage à chaque niveau](usage.png)
+
+- Jauge épaisse : la session en cours (fenêtre de 5 heures), avec son
+  pourcentage.
+- Jauge fine : la semaine (7 jours).
+- La bulle donne les deux pourcentages et l'heure du prochain reset. Elle
+  s'ouvre au survol, au clic, ou toute seule quand un seuil est franchi.
+
+| Usage (session ou semaine) | Comportement du chat |
+|---|---|
+| Moins de 50 % | Assis, jauge verte ; tape sur son ordinateur quand Claude consomme |
+| 50 % et plus | Pareil, jauge jaune |
+| 80 % et plus | Miaule, point d'exclamation orange |
+| 95 % et plus | Miaule plus vite, en rouge |
+| 100 % | S'endort jusqu'au reset ; la bulle donne l'heure de reprise |
+| Reset d'une limite presque atteinte | Saute de joie pendant 30 secondes |
+
+Le chat suit l'horloge : une fois l'heure de reset passée, la jauge revient à
+zéro même si Claude Code n'a rien envoyé depuis.
+
+Souris : survol ou clic gauche pour la bulle, glisser pour le déplacer (sa
+place est retenue), clic droit pour le remettre à sa place ou fermer le
+programme.
+
+Les chiffres arrivent par la status line de Claude Code, qui affiche aussi un
+résumé :
+
+```
+🐱 Session 42 % ↻ 14:00 · Semaine 12 %
+```
+
+Les limites d'usage n'existent qu'avec un abonnement Claude (Pro, Max, Team),
+pas avec une clé d'API. Aucun appel réseau, aucun accès aux identifiants : tout
+vient de ce que Claude Code transmet à la status line.
 
 ## Pré-requis
 
@@ -70,6 +112,10 @@ s'y trouve déjà, après avoir copié le fichier dans
 `~/.claude/settings.json.backup-we-always-need-cats`. Les chats arrivent au
 prochain événement de Claude Code.
 
+Il déclare aussi la status line du chat d'usage. Si une status line est déjà en
+place, elle est conservée et le chat d'usage n'est pas installé ; `--force` la
+remplace. `--no-usage` installe uniquement les chats de session.
+
 Pour ne les installer que sur un projet :
 
 ```bash
@@ -89,7 +135,15 @@ prochain événement.
   "follow_after_done": 30,
   "sleep_delay": 180,
   "speed": 800,
-  "log": false
+  "log": false,
+  "lang": "fr",
+  "coat": "ginger",
+  "warn": 50,
+  "alert": 80,
+  "critical": 95,
+  "notify_seconds": 12,
+  "keep_alive": false,
+  "statusline": true
 }
 ```
 
@@ -101,6 +155,16 @@ prochain événement.
 - `log` : écrit les événements reçus dans
   `~/.cache/we-always-need-cats/cats.log`.
 
+Pour le chat d'usage (qui suit aussi `scale`) :
+
+- `lang` : langue de la bulle et de la status line, `fr` ou `en`.
+- `coat` : pelage, `ginger`, `grey`, `black`, `cream`, `brown` ou `blue`.
+- `warn`, `alert`, `critical` : seuils en pourcentage.
+- `notify_seconds` : durée d'ouverture de la bulle au passage d'un seuil.
+- `keep_alive` : `true` pour que le chat reste après la fermeture de Claude
+  Code (utile pour attendre un reset). Sinon il part avec la dernière session.
+- `statusline` : `false` pour ne rien écrire dans la status line.
+
 ## Fonctionnement
 
 - `hook.py` est appelé par Claude Code à chaque événement (hooks déclarés dans
@@ -111,7 +175,13 @@ prochain événement.
 - `kwin_cursor.js` est un script KWin chargé par `cats.py`. Sous Wayland, une
   application ne peut pas lire la position de la souris : KWin la transmet.
 - `sprites.py` contient les dessins et les couleurs.
-- `install.py` déclare et retire les hooks.
+- `usage_statusline.py` est appelé par Claude Code à chaque rafraîchissement
+  de la status line. Il reçoit les limites du compte (`rate_limits`), les
+  enregistre dans `~/.cache/usage-cat/state.json`, lance `usage_cat.py` s'il ne
+  tourne pas, et écrit le résumé.
+- `usage_cat.py` affiche le chat d'usage et relit ce fichier chaque seconde ;
+  `usage_common.py` regroupe ses réglages, ses seuils et ses textes.
+- `install.py` déclare et retire les hooks et la status line.
 
 ## Modifier les dessins
 
@@ -131,6 +201,10 @@ produit une planche de toutes les images pour contrôler le résultat.
 ```bash
 python3 demo.py            # scénario complet, environ 40 secondes
 python3 demo.py question   # un seul état : idle, work, agents, question, done, end
+
+python3 usage_demo.py      # chat d'usage : scénario complet, environ 50 secondes
+python3 usage_demo.py 85   # un seul pourcentage, jusqu'à Ctrl+C
+python3 usage_cat.py --preview usage.png   # planche de tous ses états
 ```
 
 ## Désinstaller
@@ -140,7 +214,8 @@ python3 install.py --uninstall
 ```
 
 Si ce dossier est déplacé, relancer `python3 install.py` depuis son nouvel
-emplacement : les hooks contiennent le chemin complet de `hook.py`.
+emplacement : les hooks et la status line contiennent le chemin complet des
+scripts.
 
 ## Licence
 
