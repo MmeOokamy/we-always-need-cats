@@ -1,0 +1,11 @@
+# Local settings of the program (per machine)
+config.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Generated locally
+*.log
