@@ -63,14 +63,20 @@ def command():
 
 
 def is_ours(entry):
-    """True for a hook entry pointing at this project's hook.py."""
+    """True for a hook entry pointing at this project's hook.py.
+
+    The script path may sit in `command` (python3 "…/hook.py") or in `args`
+    (pythonw.exe + ["…/hook.py"]), so both are scanned; "chat-bureau" is the
+    old name, matched so that an earlier install is migrated cleanly.
+    """
     if not isinstance(entry, dict):
         return False
     for hook in entry.get("hooks") or []:
-        if isinstance(hook, dict) and "hook.py" in str(hook.get("command", "")):
-            path = str(hook["command"])
-            if HOOK in path or APP_NAME in path or "chat-bureau" in path:  # old name
-                return True
+        if not isinstance(hook, dict):
+            continue
+        path = " ".join([str(hook.get("command", ""))] + [str(a) for a in hook.get("args") or []])
+        if "hook.py" in path and (HOOK in path or APP_NAME in path or "chat-bureau" in path):
+            return True
     return False
 
 
