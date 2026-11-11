@@ -8,12 +8,12 @@ usage_cat.py, starts that program when it is not running, and prints a short
 usage summary as the status line.
 """
 
-import fcntl
 import json
 import os
 import sys
 import time
 
+import compat
 import usage_common as common
 
 
@@ -31,50 +31,16 @@ def to_epoch(value):
     return None
 
 
-def claude_pid():
-    """Walks up the parent processes to Claude Code, to know when it stops."""
-    pid = os.getppid()
-    for _ in range(8):
-        try:
-            with open(f"/proc/{pid}/comm") as f:
-                name = f.read().strip()
-            with open(f"/proc/{pid}/stat") as f:
-                parent = int(f.read().rsplit(")", 1)[1].split()[1])
-        except (OSError, ValueError, IndexError):
-            return 0
-        if name in ("claude", "node"):
-            return pid
-        if parent <= 1:
-            return 0
-        pid = parent
-    return 0
-
-
 def program_is_running():
-    """The program holds a lock for as long as it lives."""
-    try:
-        with open(common.LOCK, "a") as lock:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
-        return True
-    return False
+    """The program holds its port for as long as it lives."""
+    return compat.instance_running(common.LOCK_PORT)
 
 
 def start_program():
-    if not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
+    if not compat.has_display():
         return
-    import subprocess
-
-    os.makedirs(common.CACHE, exist_ok=True)
-    with open(os.path.join(common.CACHE, "start.log"), "ab") as logfile:
-        subprocess.Popen(
-            ["/usr/bin/env", "python3", os.path.join(common.BASE_DIR, "usage_cat.py")],
-            stdin=subprocess.DEVNULL,
-            stdout=logfile,
-            stderr=logfile,
-            cwd=common.BASE_DIR,
-            start_new_session=True,
-        )
+    log = os.path.join(common.CACHE, "start.log")
+    compat.spawn_detached(os.path.join(common.BASE_DIR, "usage_cat.py"), log)
 
 
 def update_state(event, now):
@@ -90,7 +56,7 @@ def update_state(event, now):
                 }
     # Without rate limits (start of a session), the last known values are kept.
     state["ts"] = now
-    state["pid"] = claude_pid()
+    state["pid"] = compat.claude_pid()
     common.write_state(state)
     return state
 
@@ -111,6 +77,12 @@ def status_text(state, now):
 
 
 def main():
+    # The status line carries a 🐱 emoji; on Windows stdout defaults to cp1252
+    # and would fail to encode it, so UTF-8 is forced.
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
     try:
         event = json.load(sys.stdin)
     except ValueError:

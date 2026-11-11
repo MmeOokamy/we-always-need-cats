@@ -9,13 +9,12 @@ gets in Claude Code's way.
 
 import json
 import os
-import socket
 import sys
+
+import compat
 
 APP_NAME = "we-always-need-cats"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-RUNTIME = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
-SOCKET = os.path.join(RUNTIME, f"{APP_NAME}.sock")
 
 
 def short(text, length=60):
@@ -36,46 +35,11 @@ def tool_detail(tool_input):
     return ""
 
 
-def claude_pid():
-    """Walks up the parent processes to Claude Code, to know when it stops."""
-    pid = os.getppid()
-    for _ in range(8):
-        try:
-            with open(f"/proc/{pid}/comm") as f:
-                name = f.read().strip()
-            with open(f"/proc/{pid}/stat") as f:
-                parent = int(f.read().rsplit(")", 1)[1].split()[1])
-        except (OSError, ValueError, IndexError):
-            return 0
-        if name in ("claude", "node"):
-            return pid
-        if parent <= 1:
-            return 0
-        pid = parent
-    return 0
-
-
-def send(data):
-    with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as s:
-        s.sendto(data, SOCKET)
-
-
 def start_program():
-    if not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
+    if not compat.has_display():
         return False
-    import subprocess
-
-    cache = os.path.join(os.path.expanduser("~"), ".cache", APP_NAME)
-    os.makedirs(cache, exist_ok=True)
-    with open(os.path.join(cache, "start.log"), "ab") as logfile:
-        subprocess.Popen(
-            ["/usr/bin/env", "python3", os.path.join(BASE_DIR, "cats.py")],
-            stdin=subprocess.DEVNULL,
-            stdout=logfile,
-            stderr=logfile,
-            cwd=BASE_DIR,
-            start_new_session=True,
-        )
+    log = os.path.join(os.path.expanduser("~"), ".cache", APP_NAME, "start.log")
+    compat.spawn_detached(os.path.join(BASE_DIR, "cats.py"), log)
     return True
 
 
@@ -98,25 +62,22 @@ def main():
         "agent_type": e.get("agent_type") or "",
         "notif": e.get("notification_type") or "",
         "message": short(e.get("message"), 80),
-        "pid": claude_pid(),
+        "pid": compat.claude_pid(),
     }
     data = json.dumps(message).encode()
-    try:
-        send(data)
+    if compat.instance_running(compat.SESSION_PORT):
+        compat.send(compat.SESSION_PORT, data)
         return
-    except OSError:
-        pass
     if event == "SessionEnd" or not start_program():
         return
     import time
 
-    for _ in range(30):
+    # Wait for the program to take the port, then send it the event.
+    for _ in range(50):
         time.sleep(0.1)
-        try:
-            send(data)
+        if compat.instance_running(compat.SESSION_PORT):
+            compat.send(compat.SESSION_PORT, data)
             return
-        except OSError:
-            continue
 
 
 if __name__ == "__main__":

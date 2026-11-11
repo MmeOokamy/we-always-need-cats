@@ -14,6 +14,8 @@ Sheet of every state, for a visual check: python3 usage_cat.py --preview usage.p
 import os
 import sys
 
+import compat
+
 PREVIEW = "--preview" in sys.argv
 if PREVIEW:
     os.environ["QT_QPA_PLATFORM"] = "offscreen"
@@ -22,7 +24,6 @@ elif os.environ.get("DISPLAY"):
     # stay above the others, so that mode is forced before Qt is loaded.
     os.environ["QT_QPA_PLATFORM"] = "xcb"
 
-import fcntl
 import json
 import math
 import signal
@@ -104,12 +105,16 @@ class UsageCat(QWidget):
         self.signature = None
 
         self.setWindowTitle(common.APP_NAME)
-        self.setWindowFlags(
+        flags = (
             Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
-            | Qt.WindowType.X11BypassWindowManagerHint
             | Qt.WindowType.WindowDoesNotAcceptFocus
         )
+        if compat.IS_WINDOWS:
+            flags |= Qt.WindowType.Tool  # no entry in the task bar
+        else:
+            flags |= Qt.WindowType.X11BypassWindowManagerHint
+        self.setWindowFlags(flags)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
         self.setFixedSize(WIDTH, HEIGHT)
@@ -196,7 +201,7 @@ class UsageCat(QWidget):
         if SETTINGS["keep_alive"] or now - self.started < 45:
             return False
         if self.pids:
-            return not any(os.path.exists(f"/proc/{pid}") for pid in self.pids)
+            return not any(compat.process_alive(pid) for pid in self.pids)
         return now - self.state.get("ts", self.started) > 12 * 3600
 
     # --- Drawing ------------------------------------------------------------
@@ -449,10 +454,9 @@ def main():
         preview(sys.argv[position + 1] if len(sys.argv) > position + 1 else "usage.png")
         return 0
 
-    lock = open(common.LOCK, "w")
-    try:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
+    # Holding the port is the single-instance lock; keep it for the whole run.
+    lock = compat.claim_port(common.LOCK_PORT)
+    if lock is None:
         return 0  # the program is already running
 
     cat = UsageCat()

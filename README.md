@@ -78,9 +78,9 @@ set `"lang": "en"` for English.
 
 ## Requirements
 
-- Linux with a graphical session (Wayland or X11)
+- Linux (Wayland or X11) **or Windows 10/11**
 - Python 3.9 or later
-- PyQt6, including the D-Bus module
+- PyQt6 (the D-Bus module is only needed on Linux)
 
 ```bash
 # Arch / Manjaro
@@ -95,6 +95,15 @@ Under Wayland the program displays through XWayland, the only way to place a
 window freely and keep it above the others. Following the mouse needs KWin
 (KDE Plasma); everywhere else the cat stays in its spot and still reports what
 Claude Code is doing.
+
+### Windows
+
+The cats run on Windows too; use `pip install PyQt6` and run the commands below
+with `python` instead of `python3` (on Windows `python3` opens the Microsoft
+Store, which is the usual cause of a "Python introuvable" hook error). The
+install script registers the hooks with the current interpreter (`pythonw.exe`,
+so no console window flashes). Mouse-following works out of the box, with no
+KWin or D-Bus; the events travel over a local UDP socket on `127.0.0.1`.
 
 ## Install
 

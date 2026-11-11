@@ -81,9 +81,9 @@ vient de ce que Claude Code transmet à la status line.
 
 ## Pré-requis
 
-- Linux avec une session graphique (Wayland ou X11)
+- Linux (Wayland ou X11) **ou Windows 10/11**
 - Python 3.9 ou plus récent
-- PyQt6, module D-Bus compris
+- PyQt6 (le module D-Bus n'est utile que sous Linux)
 
 ```bash
 # Arch / Manjaro
@@ -98,6 +98,16 @@ Sous Wayland, le programme s'affiche via XWayland, seul moyen de placer une
 fenêtre librement et de la garder au-dessus des autres. Le suivi de la souris
 demande KWin (KDE Plasma) ; ailleurs, le chat reste à sa place et rend compte
 malgré tout de ce que fait Claude Code.
+
+### Windows
+
+Les chats fonctionnent aussi sous Windows : `pip install PyQt6`, puis lancez les
+commandes ci-dessous avec `python` au lieu de `python3` (sous Windows, `python3`
+ouvre le Microsoft Store, cause habituelle de l'erreur « Python introuvable »
+dans les hooks). Le script d'installation enregistre les hooks avec
+l'interpréteur courant (`pythonw.exe`, donc aucune fenêtre console ne clignote).
+Le suivi de la souris marche directement, sans KWin ni D-Bus ; les événements
+passent par une socket UDP locale sur `127.0.0.1`.
 
 ## Installation
 

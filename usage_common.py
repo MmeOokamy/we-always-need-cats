@@ -9,13 +9,15 @@ import os
 import time
 
 # The demo uses its own files, so that it never touches the real usage data.
-APP_NAME = "usage-cat" + ("-demo" if os.environ.get("USAGE_CAT_DEMO") else "")
+_DEMO = bool(os.environ.get("USAGE_CAT_DEMO"))
+APP_NAME = "usage-cat" + ("-demo" if _DEMO else "")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-RUNTIME = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
-LOCK = os.path.join(RUNTIME, f"{APP_NAME}.lock")
 CACHE = os.path.join(os.path.expanduser("~"), ".cache", APP_NAME)
 STATE = os.path.join(CACHE, "state.json")
 POSITION = os.path.join(CACHE, "position.json")
+# Loopback port held by the usage cat as its single-instance lock (a distinct
+# one for the demo, so it can run next to the real cat).
+LOCK_PORT = 51712 if _DEMO else 51711
 
 # --- Settings (overridable in config.json, next to this file; the file is
 # shared with cats.py, which reads its own keys) ----------------------------

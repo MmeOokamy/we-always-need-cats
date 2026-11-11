@@ -12,21 +12,32 @@ Manual start: python3 cats.py
 import os
 import sys
 
+import compat
+
 # Under Wayland, only an X11 window (XWayland) can place itself freely and stay
 # above the others, so that mode is forced before Qt is loaded.
 if os.environ.get("DISPLAY"):
     os.environ["QT_QPA_PLATFORM"] = "xcb"
 
-import fcntl
 import json
 import math
 import signal
-import socket
 import time
 import zlib
 
 from PyQt6.QtCore import QObject, QPoint, QPointF, QRect, QSocketNotifier, Qt, QTimer, pyqtSlot
-from PyQt6.QtDBus import QDBusConnection, QDBusInterface
+
+# The KWin mouse tracking (D-Bus) is only useful under Wayland; elsewhere, and on
+# Windows where QtDBus may be missing, the mouse is read directly.
+HAVE_DBUS = False
+if not compat.IS_WINDOWS:
+    try:
+        from PyQt6.QtDBus import QDBusConnection, QDBusInterface
+
+        HAVE_DBUS = True
+    except ImportError:
+        pass
+
 from PyQt6.QtGui import (
     QColor,
     QCursor,
@@ -45,14 +56,15 @@ import sprites
 
 APP_NAME = "we-always-need-cats"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-RUNTIME = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
-SOCKET = os.path.join(RUNTIME, f"{APP_NAME}.sock")
-LOCK = os.path.join(RUNTIME, f"{APP_NAME}.lock")
 CACHE = os.path.join(os.path.expanduser("~"), ".cache", APP_NAME)
 KWIN_SCRIPT = f"{APP_NAME}-cursor"
 DBUS_SERVICE = "org.weneedcats"
 DBUS_PATH = "/Cursor"
 DBUS_INTERFACE = "org.weneedcats.Cursor"
+
+
+class AlreadyRunning(Exception):
+    """Raised when another instance already holds the port: the program runs."""
 
 # --- Settings (overridable in config.json, next to this file) ---------------
 
@@ -166,12 +178,16 @@ class Cat(QWidget):
         self.signature = None
 
         self.setWindowTitle(APP_NAME)
-        self.setWindowFlags(
+        flags = (
             Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
-            | Qt.WindowType.X11BypassWindowManagerHint
             | Qt.WindowType.WindowDoesNotAcceptFocus
         )
+        if compat.IS_WINDOWS:
+            flags |= Qt.WindowType.Tool  # no entry in the task bar
+        else:
+            flags |= Qt.WindowType.X11BypassWindowManagerHint
+        self.setWindowFlags(flags)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
         self.setFixedSize(WIDTH, HEIGHT)
@@ -469,16 +485,17 @@ class App(QObject):
         self.empty_since = time.monotonic() + 45  # grace period at start-up
         self.last_tick = time.monotonic()
 
-        if os.path.exists(SOCKET):
-            os.unlink(SOCKET)
-        self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-        self.socket.bind(SOCKET)
-        os.chmod(SOCKET, 0o600)
+        # Holding the port is also the single-instance lock: if another cat
+        # program already runs, the bind fails and we step aside.
+        self.socket = compat.claim_port(compat.SESSION_PORT)
+        if self.socket is None:
+            raise AlreadyRunning()
         self.socket.setblocking(False)
         self.listener = QSocketNotifier(self.socket.fileno(), QSocketNotifier.Type.Read, self)
         self.listener.activated.connect(self.read)
 
-        self.connect_cursor()
+        if HAVE_DBUS:
+            self.connect_cursor()
 
         self.tick = QTimer(self)
         self.tick.timeout.connect(self.animate)
@@ -679,7 +696,7 @@ class App(QObject):
     def clean_up(self):
         now = time.monotonic()
         for session, cat in list(self.cats.items()):
-            stopped = cat.pid and not os.path.exists(f"/proc/{cat.pid}")
+            stopped = cat.pid and not compat.process_alive(cat.pid)
             if stopped or now - cat.seen > 12 * 3600:
                 self.remove(session)
                 continue
@@ -692,25 +709,22 @@ class App(QObject):
             QApplication.instance().quit()
 
     def shutdown(self):
-        self.disconnect_cursor()
+        if HAVE_DBUS:
+            self.disconnect_cursor()
         try:
             self.socket.close()
-            os.unlink(SOCKET)
         except OSError:
             pass
 
 
 def main():
-    lock = open(LOCK, "w")
-    try:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
-        return 0  # the program is already running
-
     application = QApplication(sys.argv)
     application.setApplicationName(APP_NAME)
     application.setQuitOnLastWindowClosed(False)
-    app = App()
+    try:
+        app = App()
+    except AlreadyRunning:
+        return 0  # the program is already running (port taken)
     application.aboutToQuit.connect(app.shutdown)
     for stop_signal in (signal.SIGINT, signal.SIGTERM):
         signal.signal(stop_signal, lambda *_: application.quit())

@@ -43,8 +43,23 @@ EVENTS = EVENTS_WITH_MATCHER + (
 )
 
 
+def interpreter():
+    """How to run a script in a hook command, per platform.
+
+    On Windows `python3` does not exist (it opens the Microsoft Store), so the
+    current interpreter is used, preferring pythonw.exe to avoid a console flash.
+    """
+    if not sys.platform.startswith("win"):
+        return "python3"
+    executable = sys.executable
+    pythonw = os.path.join(os.path.dirname(executable), "pythonw.exe")
+    if os.path.exists(pythonw):
+        executable = pythonw
+    return f'"{executable}"'
+
+
 def command():
-    return f'python3 "{HOOK}"'
+    return f'{interpreter()} "{HOOK}"'
 
 
 def is_ours(entry):
@@ -121,7 +136,7 @@ def install_status_line(settings, force):
             f"({json.dumps(current, ensure_ascii=False)}).\n"
             "Run again with --force to replace it."
         )
-    settings["statusLine"] = {"type": "command", "command": f'python3 "{STATUS_LINE}"'}
+    settings["statusLine"] = {"type": "command", "command": f'{interpreter()} "{STATUS_LINE}"'}
     return "Status line installed: the usage cat shows up at its next refresh."
 
 
