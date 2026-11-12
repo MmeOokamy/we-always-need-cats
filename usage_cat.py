@@ -481,10 +481,8 @@ def main():
     if common.file_setting("usage_cat") is False:
         print("usage-cat est masqué (usage_cat: false dans config.json)")
         return 0
-    lock = open(common.LOCK, "w")
-    try:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
+    lock_socket = compat.claim_port(common.LOCK_PORT)
+    if lock_socket is None:
         return 0  # the program is already running
 
     cat = UsageCat()

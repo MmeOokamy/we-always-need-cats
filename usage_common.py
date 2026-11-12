@@ -12,7 +12,9 @@ import time
 _DEMO = bool(os.environ.get("USAGE_CAT_DEMO"))
 APP_NAME = "usage-cat" + ("-demo" if _DEMO else "")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-RUNTIME = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
+RUNTIME = os.environ.get("XDG_RUNTIME_DIR") or (
+    f"/run/user/{os.getuid()}" if hasattr(os, "getuid") else ""
+)
 LOCK = os.path.join(RUNTIME, f"{APP_NAME}.lock")
 # Socket of the session cats (cats.py), used to ask them to leave.
 CATS_SOCKET = os.path.join(RUNTIME, "we-always-need-cats.sock")
@@ -79,11 +81,10 @@ def file_setting(key):
 
 def dismiss_session_cats():
     """Ask cats.py, if it is running, to close every session cat and quit."""
-    import socket
+    import compat
 
     try:
-        with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as s:
-            s.sendto(json.dumps({"ev": "Quit"}).encode(), CATS_SOCKET)
+        compat.send(compat.SESSION_PORT, json.dumps({"ev": "Quit"}).encode())
     except OSError:
         pass  # not running
 

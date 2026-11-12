@@ -885,12 +885,6 @@ class App(QObject):
 def main():
     if not SETTINGS.get("session_cats", True):
         return 0  # usage cat only (setting session_cats)
-    lock = open(LOCK, "w")
-    try:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
-        return 0  # the program is already running
-
     application = QApplication(sys.argv)
     application.setApplicationName(APP_NAME)
     application.setQuitOnLastWindowClosed(False)
