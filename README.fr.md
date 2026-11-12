@@ -8,8 +8,8 @@ montre ce que fait chaque session Claude Code.
 *English: [README.md](README.md)*
 
 - Un chat par session Claude Code ouverte, chacun avec son pelage.
-- Un chaton par sous-agent en cours d'exécution, d'une couleur propre à chaque
-  type d'agent.
+- Un chaton par sous-agent en cours d'exécution, autant de chatons que de
+  sous-agents, d'une couleur propre à chaque type d'agent.
 - Une bulle indique le projet et l'action en cours.
 - Un chat à part surveille les limites d'usage de Claude Code (voir
   [Le chat d'usage](#le-chat-dusage)).
@@ -21,7 +21,7 @@ montre ce que fait chaque session Claude Code.
 | Session ouverte, rien en cours | Assis à sa place, puis endormi après 3 minutes |
 | Claude travaille | Tape sur son ordinateur ; la bulle décrit l'action |
 | Claude réfléchit (entre deux actions) | Fait sauter des crêpes dans une poêle, en alternance avec son ordinateur |
-| Sous-agents en cours | Des chatons travaillent à côté de lui |
+| Sous-agents en cours | Des chatons travaillent à côté de lui, un par sous-agent |
 | Question ou demande d'autorisation | Court vers la souris et la suit, bulle orange |
 | Tâche terminée | Court vers la souris, saute de joie, bulle verte ; retourne à sa place après 30 secondes |
 | Session fermée | Le chat disparaît |
@@ -34,14 +34,23 @@ poêle : le chat fait sauter une crêpe, qui se retourne en l'air avant de
 retomber dans la poêle. Il change toutes les deux crêpes pendant une longue
 réflexion, et une réflexion sur deux commence par les crêpes.
 
+Les chatons s'installent à droite du chat, par rangées de trois, sur trois
+niveaux légèrement superposés. Au-delà de neuf sous-agents, ils se serrent sur
+leurs rangées : chaque sous-agent garde son chaton. La bulle donne le nombre de
+sous-agents et leurs types. Comme le chat, un chaton dont le sous-agent
+réfléchit alterne entre son ordinateur et sa poêle à crêpes, chacun à son
+rythme.
+
 ## Souris
 
 - Clic gauche sur le chat : il arrête de suivre la souris et retourne à sa place.
 - Glisser le chat : le poser ailleurs, ce qui devient sa nouvelle place.
 - Survol : affiche le nom du projet d'un chat au repos.
 - Clic droit : remettre le chat à sa place, renvoyer ce chat, choisir quand les
-  chats suivent la souris, ne garder que le chat d'usage (voir
-  [Chat d'usage seul](#chat-dusage-seul)), ou fermer le programme.
+  chats suivent la souris, afficher ou masquer le chat d'usage (case **Usage
+  cat**, voir [Masquer le chat d'usage](#masquer-le-chat-dusage)), ne garder
+  que le chat d'usage (voir [Chat d'usage seul](#chat-dusage-seul)), ou fermer
+  le programme.
 
 Le sous-menu **Follow the mouse** contient deux cases à cocher, communes à tous
 les chats de session et enregistrées dans `config.json` :
@@ -234,7 +243,7 @@ Pour le chat d'usage (qui suit aussi `scale`) :
 - `usage_statusline.py` est appelé par Claude Code à chaque rafraîchissement
   de la status line. Il reçoit les limites du compte (`rate_limits`), les
   enregistre dans `~/.cache/usage-cat/state.json`, lance `usage_cat.py` s'il ne
-  tourne pas, et écrit le résumé.
+  tourne pas et n'a pas été masqué (`usage_cat`), et écrit le résumé.
 - `usage_cat.py` affiche le chat d'usage et relit ce fichier chaque seconde ;
   `usage_common.py` regroupe ses réglages, ses seuils et ses textes.
 - `install.py` déclare et retire les hooks et la status line.

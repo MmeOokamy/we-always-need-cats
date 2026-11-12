@@ -8,7 +8,8 @@ Claude Code session is doing.
 *Français : [README.fr.md](README.fr.md)*
 
 - One cat per open Claude Code session, each with its own coat.
-- One kitten per running subagent, in a color of its own.
+- One kitten per running subagent, as many kittens as subagents, in a color of
+  its own for each agent type.
 - A speech bubble shows the project and the current action.
 - A separate cat watches the Claude Code usage limits (see
   [The usage cat](#the-usage-cat)).
@@ -20,7 +21,7 @@ Claude Code session is doing.
 | Session open, nothing running | Sits in its spot, then falls asleep after 3 minutes |
 | Claude is working | Types on its laptop; the bubble describes the action |
 | Claude is thinking (between two actions) | Flips crepes in a frying pan, alternating with its laptop |
-| Subagents running | Kittens work next to it |
+| Subagents running | Kittens work next to it, one per subagent |
 | A question or a permission prompt | Runs to the mouse and follows it, orange bubble |
 | Task finished | Runs to the mouse, jumps for joy, green bubble; goes home after 30 seconds |
 | Session closed | The cat disappears |
@@ -33,14 +34,21 @@ which turns over in the air before landing back in the pan. It changes every
 two crepes during a long thinking period, and one thinking period out of two
 starts with the crepes.
 
+The kittens sit on the right of the cat, in rows of three, up to three rows
+stacked a little over each other. Past nine subagents, they squeeze together on
+their rows: every subagent keeps its kitten. The bubble gives the number of
+subagents and their types. Like the cat, a kitten whose subagent is thinking
+alternates between its laptop and its crepe pan, each at its own pace.
+
 ## Mouse
 
 - Left click on the cat: it stops following the mouse and goes back home.
 - Drag the cat: drop it somewhere else, which becomes its new home.
 - Hover: shows the project name of a resting cat.
 - Right click: send the cat home, dismiss that cat, choose when the cats follow
-  the mouse, keep the usage cat only (see [Usage cat only](#usage-cat-only)),
-  or quit the program.
+  the mouse, show or hide the usage cat (**Usage cat** checkbox, see
+  [Hiding the usage cat](#hiding-the-usage-cat)), keep the usage cat only (see
+  [Usage cat only](#usage-cat-only)), or quit the program.
 
 The **Follow the mouse** submenu has two checkboxes, shared by every session
 cat and saved in `config.json`:
@@ -226,8 +234,8 @@ For the usage cat (which also follows `scale`):
 - `sprites.py` holds the drawings and the colors.
 - `usage_statusline.py` is called by Claude Code at every status line refresh.
   It receives the limits of the account (`rate_limits`), saves them to
-  `~/.cache/usage-cat/state.json`, starts `usage_cat.py` if it is not running,
-  and prints the summary.
+  `~/.cache/usage-cat/state.json`, starts `usage_cat.py` if it is not running
+  and has not been hidden (`usage_cat`), and prints the summary.
 - `usage_cat.py` shows the usage cat and reads that file again every second;
   `usage_common.py` holds its settings, thresholds and texts.
 - `install.py` registers and removes the hooks and the status line.
