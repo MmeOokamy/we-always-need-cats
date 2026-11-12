@@ -35,7 +35,8 @@ pour le web, rose quand il délègue à un agent, gris clair quand il réfléchi
 - Glisser le chat : le poser ailleurs, ce qui devient sa nouvelle place.
 - Survol : affiche le nom du projet d'un chat au repos.
 - Clic droit : remettre le chat à sa place, renvoyer ce chat, choisir quand les
-  chats suivent la souris, ou fermer le programme.
+  chats suivent la souris, ne garder que le chat d'usage (voir
+  [Chat d'usage seul](#chat-dusage-seul)), ou fermer le programme.
 
 Le sous-menu **Follow the mouse** contient deux cases à cocher, communes à tous
 les chats de session et enregistrées dans `config.json` :
@@ -75,8 +76,21 @@ Le chat suit l'horloge : une fois l'heure de reset passée, la jauge revient à
 zéro même si Claude Code n'a rien envoyé depuis.
 
 Souris : survol ou clic gauche pour la bulle, glisser pour le déplacer (sa
-place est retenue), clic droit pour le remettre à sa place ou fermer le
-programme.
+place est retenue), clic droit pour le remettre à sa place, afficher ou masquer
+les chats de session (case **Chats de session**), ou fermer le programme.
+
+### Chat d'usage seul
+
+Pour garder le chat d'usage sans les chats de session, au choix :
+
+- décocher **Chats de session** dans le menu (clic droit) du chat d'usage, ou
+  choisir **Usage cat only** dans le menu d'un chat de session : les chats de
+  session partent aussitôt et ne reviennent plus. Recocher la case les fait
+  revenir au prochain événement de Claude Code. Le choix est enregistré dans
+  `config.json` (`session_cats`) ;
+- ou n'installer que le chat d'usage : `python3 install.py --usage-only`
+  (status line seule, sans hooks ; retire les hooks d'une installation
+  précédente).
 
 Les chiffres arrivent par la status line de Claude Code, qui affiche aussi un
 résumé :
@@ -124,7 +138,8 @@ prochain événement de Claude Code.
 
 Il déclare aussi la status line du chat d'usage. Si une status line est déjà en
 place, elle est conservée et le chat d'usage n'est pas installé ; `--force` la
-remplace. `--no-usage` installe uniquement les chats de session.
+remplace. `--no-usage` installe uniquement les chats de session,
+`--usage-only` uniquement le chat d'usage.
 
 Pour ne les installer que sur un projet :
 
@@ -155,7 +170,8 @@ prochain événement.
   "critical": 95,
   "notify_seconds": 12,
   "keep_alive": false,
-  "statusline": true
+  "statusline": true,
+  "session_cats": true
 }
 ```
 
@@ -179,6 +195,8 @@ Pour le chat d'usage (qui suit aussi `scale`) :
 - `keep_alive` : `true` pour que le chat reste après la fermeture de Claude
   Code (utile pour attendre un reset). Sinon il part avec la dernière session.
 - `statusline` : `false` pour ne rien écrire dans la status line.
+- `session_cats` : `false` pour ne garder que le chat d'usage (se règle aussi
+  par les menus).
 
 ## Fonctionnement
 

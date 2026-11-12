@@ -34,7 +34,8 @@ while delegating to an agent, light grey while thinking.
 - Drag the cat: drop it somewhere else, which becomes its new home.
 - Hover: shows the project name of a resting cat.
 - Right click: send the cat home, dismiss that cat, choose when the cats follow
-  the mouse, or quit the program.
+  the mouse, keep the usage cat only (see [Usage cat only](#usage-cat-only)),
+  or quit the program.
 
 The **Follow the mouse** submenu has two checkboxes, shared by every session
 cat and saved in `config.json`:
@@ -72,7 +73,19 @@ The cat follows the clock: once the reset time has passed, the gauge goes back
 to zero even if Claude Code has sent nothing since.
 
 Mouse: hover or left click for the bubble, drag to move it (its spot is
-remembered), right click to send it home or quit the program.
+remembered), right click to send it home, show or hide the session cats
+(**Session cats** checkbox), or quit the program.
+
+### Usage cat only
+
+To keep the usage cat without the session cats, either:
+
+- untick **Session cats** in the usage cat's right-click menu, or pick
+  **Usage cat only** in a session cat's menu: the session cats leave at once
+  and no longer come back. Tick the box again to bring them back at the next
+  Claude Code event. The choice is saved in `config.json` (`session_cats`);
+- or install the usage cat alone: `python3 install.py --usage-only` (status
+  line only, no hooks; removes the hooks of a previous install).
 
 The figures come through the Claude Code status line, which also shows a
 summary:
@@ -121,7 +134,7 @@ the next Claude Code event.
 
 It also registers the status line of the usage cat. A status line that is
 already set is kept and the usage cat is not installed; `--force` replaces it.
-`--no-usage` installs the session cats only.
+`--no-usage` installs the session cats only, `--usage-only` the usage cat only.
 
 To install them for a single project instead:
 
@@ -152,7 +165,8 @@ next event.
   "critical": 95,
   "notify_seconds": 12,
   "keep_alive": false,
-  "statusline": true
+  "statusline": true,
+  "session_cats": true
 }
 ```
 
@@ -176,6 +190,7 @@ For the usage cat (which also follows `scale`):
 - `keep_alive`: `true` to keep the cat after Claude Code is closed (handy while
   waiting for a reset). Otherwise it leaves with the last session.
 - `statusline`: `false` to print nothing in the status line.
+- `session_cats`: `false` to keep the usage cat only (also set from the menus).
 
 ## How it works
 

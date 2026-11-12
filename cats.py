@@ -42,6 +42,7 @@ from PyQt6.QtGui import (
 from PyQt6.QtWidgets import QApplication, QMenu, QWidget
 
 import sprites
+import usage_common
 
 APP_NAME = "we-always-need-cats"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -85,19 +86,7 @@ def save_setting(key, value):
     (the file is shared with the usage cat)."""
     SETTINGS[key] = value
     try:
-        with open(CONFIG_FILE, encoding="utf-8") as f:
-            data = json.load(f)
-        if not isinstance(data, dict):
-            data = {}
-    except (OSError, ValueError):
-        data = {}
-    data[key] = value
-    try:
-        temporary = CONFIG_FILE + ".tmp"
-        with open(temporary, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-            f.write("\n")
-        os.replace(temporary, CONFIG_FILE)
+        usage_common.save_setting(key, value)
     except OSError as error:
         log("settings not saved:", error)
 
@@ -470,6 +459,7 @@ class Cat(QWidget):
             action.setChecked(bool(SETTINGS[FOLLOW_SETTING[state]]))
             action.toggled.connect(lambda checked, state=state: self.app.set_follow(state, checked))
         menu.addSeparator()
+        menu.addAction("Usage cat only (hide session cats)", self.app.usage_only)
         menu.addAction("Quit we-always-need-cats", QApplication.instance().quit)
         menu.exec(position)
 
@@ -591,6 +581,11 @@ class App(QObject):
         area = QGuiApplication.primaryScreen().availableGeometry()
         return area.adjusted(0, 0, 0, -48)
 
+    def usage_only(self):
+        """Turn the session cats off (they no longer start) and leave."""
+        save_setting("session_cats", False)
+        QApplication.instance().quit()
+
     def set_follow(self, state, enabled):
         """Menu setting, shared by every cat: follow the mouse in this state or not."""
         save_setting(FOLLOW_SETTING[state], enabled)
@@ -645,6 +640,9 @@ class App(QObject):
     def handle(self, m):
         log(json.dumps(m, ensure_ascii=False))
         event, session = m.get("ev", ""), m.get("sid", "")
+        if event == "Quit":  # sent by the usage cat when the session cats are turned off
+            QApplication.instance().quit()
+            return
         if not session:
             return
         if event == "SessionEnd":
@@ -748,6 +746,8 @@ class App(QObject):
 
 
 def main():
+    if not SETTINGS.get("session_cats", True):
+        return 0  # usage cat only (setting session_cats)
     lock = open(LOCK, "w")
     try:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)

@@ -153,6 +153,15 @@ class UsageCat(QWidget):
         except OSError:
             pass
 
+    def set_session_cats(self, enabled):
+        """Show the session cats (cats.py) or keep this usage cat alone."""
+        try:
+            common.save_setting("session_cats", enabled)
+        except OSError:
+            return
+        if not enabled:
+            common.dismiss_session_cats()
+
     def reset_home(self):
         self.home = None
         self.save_home()
@@ -395,6 +404,11 @@ class UsageCat(QWidget):
     def menu(self, position):
         menu = QMenu()
         menu.addAction(TEXT["menu_home"], self.reset_home)
+        menu.addSeparator()
+        session_cats = menu.addAction(TEXT["menu_session_cats"])
+        session_cats.setCheckable(True)
+        session_cats.setChecked(bool(SETTINGS["session_cats"]))
+        session_cats.toggled.connect(self.set_session_cats)
         menu.addSeparator()
         menu.addAction(TEXT["menu_quit"], QApplication.instance().quit)
         menu.exec(position)
