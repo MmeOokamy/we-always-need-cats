@@ -102,7 +102,12 @@ HEIGHT = BUBBLE_H + SYMBOLS_H + CAT_H
 CAT_TOP = HEIGHT - CAT_H
 
 # Frames per second of each animation.
-FPS = {"idle": 3, "question": 3, "done": 4, "work": 4, "run": 9, "sleep": 1.5}
+FPS = {"idle": 3, "question": 3, "done": 4, "work": 4, "think": 5, "run": 9, "sleep": 1.5}
+
+# While thinking, the cat alternates between crepes and its laptop: two crepe
+# flips, then the laptop for as long, and so on. Successive thinking periods
+# start one way, then the other.
+THINK_PERIOD = 2 * len(sprites.ANIMATIONS["think"]) / FPS["think"]  # seconds
 
 BUBBLE_COLOR = {"question": "#E8590C", "done": "#2F9E44"}
 
@@ -174,6 +179,8 @@ class Cat(QWidget):
         self.activity = "think"
         self.kittens = {}  # agent id -> {"type", "activity"}
         self.since = time.monotonic()
+        self.think_count = 0  # thinking periods so far (crepes or laptop first)
+        self.think_since = self.since  # start of the current thinking period
         self.seen = time.monotonic()
         self.follows = False  # follows the mouse
         self.running = False
@@ -209,11 +216,23 @@ class Cat(QWidget):
     # --- State --------------------------------------------------------------
 
     def set_state(self, state, text="", activity="think"):
+        thinking = state == "work" and activity == "think"
+        if thinking and not self.thinking():
+            self.think_count += 1
+            self.think_since = time.monotonic()
         if state != self.state:
             self.since = time.monotonic()
             setting = FOLLOW_SETTING.get(state)
             self.follows = bool(setting and SETTINGS[setting])
         self.state, self.text, self.activity = state, text, activity
+
+    def thinking(self):
+        return self.state == "work" and self.activity == "think"
+
+    def flipping_crepes(self):
+        """While thinking: crepes or laptop, alternately (see THINK_PERIOD)."""
+        turns = int((time.monotonic() - self.think_since) / THINK_PERIOD)
+        return (self.think_count + turns) % 2 == 1
 
     def acknowledge(self):
         """Click on the cat: it stops following the mouse and goes back home."""
@@ -276,7 +295,11 @@ class Cat(QWidget):
     # --- Drawing ------------------------------------------------------------
 
     def animation(self):
-        return "run" if self.running else self.state
+        if self.running:
+            return "run"
+        if self.thinking() and self.flipping_crepes():
+            return "think"  # thinking: the cat flips a crepe (or types, alternately)
+        return self.state
 
     def bubble_lines(self):
         """Text lines of the bubble, or an empty list when there is nothing to say."""
@@ -307,7 +330,12 @@ class Cat(QWidget):
         """Redraw the window when what it shows has changed."""
         animation = self.animation()
         frames = sprites.ANIMATIONS[animation]
-        index = int(time.monotonic() * FPS[animation])
+        if animation == "think":
+            # Counted from the start of the thinking period: every series of
+            # crepes starts with a throw, never in the middle of a flight.
+            index = int((time.monotonic() - self.think_since) * FPS[animation])
+        else:
+            index = int(time.monotonic() * FPS[animation])
         lines = self.bubble_lines()
         signature = (
             animation,
@@ -355,6 +383,18 @@ class Cat(QWidget):
         x = (CAT_W - image.width()) // 2
         y = HEIGHT - image.height() - jump
         painter.drawPixmap(x, y, image)
+
+        # The flying crepe (thinking)
+        if animation == "think":
+            flight = sprites.CREPE_FLIGHT[self.index % len(sprites.CREPE_FLIGHT)]
+            if flight:
+                name, column, line, flipped = flight
+                width = len(sprites.IMAGES[name][0])
+                if self.mirror:  # the cat looks the other way
+                    column = (image.width() // S - 2) - column - width
+                    flipped = not flipped
+                crepe = pixmap(name, self.coat, self.activity, flipped, S)
+                painter.drawPixmap(x + column * S, y + line * S, crepe)
 
         # The symbols above the cat
         top = CAT_TOP

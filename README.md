@@ -19,6 +19,7 @@ Claude Code session is doing.
 |---|---|
 | Session open, nothing running | Sits in its spot, then falls asleep after 3 minutes |
 | Claude is working | Types on its laptop; the bubble describes the action |
+| Claude is thinking (between two actions) | Flips crepes in a frying pan, alternating with its laptop |
 | Subagents running | Kittens work next to it |
 | A question or a permission prompt | Runs to the mouse and follows it, orange bubble |
 | Task finished | Runs to the mouse, jumps for joy, green bubble; goes home after 30 seconds |
@@ -26,7 +27,11 @@ Claude Code session is doing.
 
 The laptop screen is colored after the activity: green while writing a file,
 blue while reading or searching, yellow for a command, purple for the web, pink
-while delegating to an agent, light grey while thinking.
+while delegating to an agent, light grey while thinking. While Claude thinks,
+the cat also swaps its laptop for a frying pan now and then: it tosses a crepe,
+which turns over in the air before landing back in the pan. It changes every
+two crepes during a long thinking period, and one thinking period out of two
+starts with the crepes.
 
 ## Mouse
 

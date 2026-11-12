@@ -20,6 +20,7 @@ montre ce que fait chaque session Claude Code.
 |---|---|
 | Session ouverte, rien en cours | Assis à sa place, puis endormi après 3 minutes |
 | Claude travaille | Tape sur son ordinateur ; la bulle décrit l'action |
+| Claude réfléchit (entre deux actions) | Fait sauter des crêpes dans une poêle, en alternance avec son ordinateur |
 | Sous-agents en cours | Des chatons travaillent à côté de lui |
 | Question ou demande d'autorisation | Court vers la souris et la suit, bulle orange |
 | Tâche terminée | Court vers la souris, saute de joie, bulle verte ; retourne à sa place après 30 secondes |
@@ -28,6 +29,10 @@ montre ce que fait chaque session Claude Code.
 La couleur de l'écran de son ordinateur dépend de l'activité : vert quand il
 écrit un fichier, bleu quand il lit ou cherche, jaune pour une commande, violet
 pour le web, rose quand il délègue à un agent, gris clair quand il réfléchit.
+Quand Claude réfléchit, l'ordinateur laisse aussi place de temps en temps à une
+poêle : le chat fait sauter une crêpe, qui se retourne en l'air avant de
+retomber dans la poêle. Il change toutes les deux crêpes pendant une longue
+réflexion, et une réflexion sur deux commence par les crêpes.
 
 ## Souris
 

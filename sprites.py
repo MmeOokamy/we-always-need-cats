@@ -7,8 +7,9 @@ Every sprite is a list of text lines, one character per pixel:
     W  white (muzzle, belly)
     P  pink (ears, nose, mouth)
     E  eyes
-    G  laptop shell
+    G  laptop shell, frying pan
     L  laptop screen (color depends on the activity)
+    C  crepe              B  browned spots of the crepe
 
 After editing a drawing, run `python3 sprites.py preview.png` to see the result.
 """
@@ -87,6 +88,44 @@ _BODY_LAPTOP_RIGHT = [
     "KKKKKKKKKKKKKKKK..",
 ]
 
+# --- Crepe flipping (thinking): 20 pixels wide, the pan handle sticks out ---
+
+_BODY_PAN_FULL = [  # pan held low, the crepe in it
+    "..KFFFFFFFFFFK......",
+    ".KFKCCBCCCBCKFFK....",
+    "KGGGGGGGGGGGGGGKKKKK",
+    ".KGGGGGGGGGGGGKFFFK.",
+    ".KFFKFFKKFFKFFFFK...",
+    ".KKKKKKKKKKKKKKK....",
+]
+_BODY_PAN_EMPTY = [  # pan held low, the crepe is in the air
+    "..KFFFFFFFFFFK......",
+    ".KFFFWWWWWWFFFK.....",
+    "KGGGGGGGGGGGGGGKKKKK",
+    ".KGGGGGGGGGGGGKFFFK.",
+    ".KFFKFFKKFFKFFFFK...",
+    ".KKKKKKKKKKKKKKK....",
+]
+_BODY_PAN_UP = [  # pan raised: throwing or catching the crepe
+    "..KFFFFFFFFFFK......",
+    "KGGGGGGGGGGGGGGKKKKK",
+    ".KGGGGGGGGGGGGKFFFK.",
+    ".KFFKFWWWWFKFFK.....",
+    ".KFFKFFKKFFKFFFFK...",
+    ".KKKKKKKKKKKKKKK....",
+]
+
+
+def _wide(lines):
+    """Head lines widened to the 20 pixels of the pan bodies."""
+    return [line + ".." for line in lines]
+
+
+# The flying crepe, drawn on its own above the cat by cats.py.
+_CREPE_FLAT = [".KKKKKK.", "KCCBCCBK", ".KKKKKK."]
+_CREPE_FLIPPED = [".KKKKKK.", "KBCBBCBK", ".KKKKKK."]
+_CREPE_TILTED = ["...KK", "..KCK", ".KBK.", "KCK..", "KK..."]
+
 # --- Side views -------------------------------------------------------------
 
 _RUN_A = [
@@ -144,6 +183,12 @@ IMAGES = {
     "happy_b": _head("happy") + _BODY_TAIL_UP,
     "work_a": _head("lowered") + _BODY_LAPTOP_LEFT,
     "work_b": _head("lowered") + _BODY_LAPTOP_RIGHT,
+    "flip_full": _wide(_head("lowered")) + _BODY_PAN_FULL,
+    "flip_empty": _wide(_head("open", "open")) + _BODY_PAN_EMPTY,
+    "flip_up": _wide(_head("open", "open")) + _BODY_PAN_UP,
+    "crepe_flat": _CREPE_FLAT,
+    "crepe_flipped": _CREPE_FLIPPED,
+    "crepe_tilted": _CREPE_TILTED,
     "run_a": _RUN_A,
     "run_b": _RUN_B,
     "sleep_a": _SLEEP_A,
@@ -156,9 +201,34 @@ ANIMATIONS = {
     "question": ["meow_a", "meow_b"],
     "done": ["happy_a", "happy_b"],
     "work": ["work_a", "work_b"],
+    # Thinking: the cat flips a crepe (see CREPE_FLIGHT for the crepe itself).
+    "think": [
+        "flip_full",
+        "flip_full",
+        "flip_up",
+        "flip_empty",
+        "flip_empty",
+        "flip_empty",
+        "flip_up",
+        "flip_full",
+    ],
     "run": ["run_a", "run_b"],
     "sleep": ["sleep_a"] * 3 + ["sleep_b"] * 3,
 }
+
+# Flying crepe, frame by frame of the "think" animation: (sprite, column, line,
+# mirrored), in pixels of the cat sprite (line < 0: above the cat), or None
+# while the crepe lies in the pan.
+CREPE_FLIGHT = [
+    None,
+    None,
+    ("crepe_flat", 4, -1, False),  # thrown, already above the head
+    ("crepe_tilted", 6, -4, False),  # turning over
+    ("crepe_flipped", 4, -6, False),  # top of the flight (stays under the bubble)
+    ("crepe_tilted", 6, -4, True),  # falling back
+    ("crepe_flat", 4, -1, False),  # about to land in the pan
+    None,
+]
 
 # Small symbols drawn above the cat.
 SYMBOLS = {
@@ -216,6 +286,8 @@ def palette(coat, activity="think"):
         "E": "#2B2230",
         "G": "#5B6472",
         "L": SCREENS.get(activity, SCREENS["think"]),
+        "C": "#F6C86E",
+        "B": "#C98A3A",
     }
 
 
