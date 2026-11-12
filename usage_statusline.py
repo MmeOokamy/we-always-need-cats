@@ -91,7 +91,9 @@ def main():
         event = {}
     now = time.time()
     state = update_state(event, now)
-    if not program_is_running():
+    # The figures are saved in any case (other displays read them), but the
+    # cat only starts when it has not been hidden (setting usage_cat).
+    if common.file_setting("usage_cat") is not False and not program_is_running():
         start_program()
     if common.SETTINGS["statusline"]:
         print(status_text(state, now))

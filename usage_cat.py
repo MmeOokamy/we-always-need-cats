@@ -158,6 +158,24 @@ class UsageCat(QWidget):
         except OSError:
             pass
 
+    def set_session_cats(self, enabled):
+        """Show the session cats (cats.py) or keep this usage cat alone."""
+        try:
+            common.save_setting("session_cats", enabled)
+        except OSError:
+            return
+        if not enabled:
+            common.dismiss_session_cats()
+
+    def hide_for_good(self):
+        """Leave and stay hidden: the status line no longer starts the cat
+        (setting usage_cat, turned back on from a session cat's menu)."""
+        try:
+            common.save_setting("usage_cat", False)
+        except OSError:
+            return
+        QApplication.instance().quit()
+
     def reset_home(self):
         self.home = None
         self.save_home()
@@ -401,6 +419,12 @@ class UsageCat(QWidget):
         menu = QMenu()
         menu.addAction(TEXT["menu_home"], self.reset_home)
         menu.addSeparator()
+        session_cats = menu.addAction(TEXT["menu_session_cats"])
+        session_cats.setCheckable(True)
+        session_cats.setChecked(bool(SETTINGS["session_cats"]))
+        session_cats.toggled.connect(self.set_session_cats)
+        menu.addSeparator()
+        menu.addAction(TEXT["menu_hide"], self.hide_for_good)
         menu.addAction(TEXT["menu_quit"], QApplication.instance().quit)
         menu.exec(position)
 
@@ -454,9 +478,13 @@ def main():
         preview(sys.argv[position + 1] if len(sys.argv) > position + 1 else "usage.png")
         return 0
 
-    # Holding the port is the single-instance lock; keep it for the whole run.
-    lock = compat.claim_port(common.LOCK_PORT)
-    if lock is None:
+    if common.file_setting("usage_cat") is False:
+        print("usage-cat est masqué (usage_cat: false dans config.json)")
+        return 0
+    lock = open(common.LOCK, "w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
         return 0  # the program is already running
 
     cat = UsageCat()
@@ -468,7 +496,8 @@ def main():
 
     def watch():
         cat.poll()
-        if cat.should_quit(time.time()):
+        # Hidden from a session cat's menu: leave at once.
+        if cat.should_quit(time.time()) or common.file_setting("usage_cat") is False:
             application.quit()
 
     watcher = QTimer()

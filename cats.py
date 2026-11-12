@@ -53,6 +53,7 @@ from PyQt6.QtGui import (
 from PyQt6.QtWidgets import QApplication, QMenu, QWidget
 
 import sprites
+import usage_common
 
 APP_NAME = "we-always-need-cats"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -70,31 +71,77 @@ class AlreadyRunning(Exception):
 
 SETTINGS = {
     "scale": 4,  # size of one drawing pixel, in screen pixels
-    "follow_mouse": True,  # the cat walks to the mouse (question, finished task)
+    "follow_mouse": True,  # default of the two settings below
+    "follow_on_question": None,  # follow the mouse when Claude needs you (None: follow_mouse)
+    "follow_on_done": None,  # follow the mouse when a task is finished (None: follow_mouse)
     "follow_after_done": 30,  # seconds spent following the mouse after a finished task
     "sleep_delay": 180,  # seconds of idling before the cat falls asleep
     "speed": 800,  # running speed, in pixels per second
     "log": False,  # write received events to ~/.cache/we-always-need-cats/cats.log
 }
+CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 try:
-    with open(os.path.join(BASE_DIR, "config.json"), encoding="utf-8") as _f:
+    with open(CONFIG_FILE, encoding="utf-8") as _f:
         SETTINGS.update(json.load(_f))
 except (OSError, ValueError):
     pass
+for _key in ("follow_on_question", "follow_on_done"):
+    if SETTINGS[_key] is None:
+        SETTINGS[_key] = bool(SETTINGS["follow_mouse"])
+
+# Cat state -> setting deciding whether the cat follows the mouse in that state.
+FOLLOW_SETTING = {"question": "follow_on_question", "done": "follow_on_done"}
+
+
+def save_setting(key, value):
+    """Change one setting and write it to config.json, keeping the other values
+    (the file is shared with the usage cat)."""
+    SETTINGS[key] = value
+    try:
+        usage_common.save_setting(key, value)
+    except OSError as error:
+        log("settings not saved:", error)
 
 S = max(1, int(SETTINGS["scale"]))  # cat scale
 S2 = max(1, S // 2)  # kitten scale
 CAT_W, CAT_H = sprites.CELL_W * S, sprites.CELL_H * S
 KITTEN_W, KITTEN_H = sprites.CELL_W * S2 + 2, sprites.CELL_H * S2
-MAX_KITTENS = 3
+# Kittens sit on the right of the cat, in rows of KITTEN_COLUMNS, up to
+# KITTEN_ROWS rows stacked a little over each other. With more kittens than
+# that, they squeeze together on their rows: every subagent keeps its kitten.
+KITTEN_COLUMNS = 3
+KITTEN_ROWS = 3
+KITTEN_ROW_STEP = KITTEN_H * 5 // 6
 SYMBOLS_H = 7 * S
 BUBBLE_H = 64
-WIDTH = CAT_W + 4 + MAX_KITTENS * KITTEN_W
+WIDTH = CAT_W + 4 + KITTEN_COLUMNS * KITTEN_W
 HEIGHT = BUBBLE_H + SYMBOLS_H + CAT_H
 CAT_TOP = HEIGHT - CAT_H
 
+
+
+def kitten_places(count):
+    """(index, x, row) of each kitten: rows filled from the bottom, left to
+    right; past KITTEN_ROWS full rows, more columns, closer together."""
+    if not count:
+        return []
+    rows = min(KITTEN_ROWS, -(-count // KITTEN_COLUMNS))
+    columns = max(KITTEN_COLUMNS, -(-count // rows))
+    room = KITTEN_COLUMNS * KITTEN_W - KITTEN_W  # left edge of the last column
+    step = min(KITTEN_W, room / (columns - 1)) if columns > 1 else 0
+    return [
+        (i, CAT_W + 4 + int((i % columns) * step), i // columns)
+        for i in range(count)
+    ]
+
+
 # Frames per second of each animation.
-FPS = {"idle": 3, "question": 3, "done": 4, "work": 4, "run": 9, "sleep": 1.5}
+FPS = {"idle": 3, "question": 3, "done": 4, "work": 4, "think": 5, "run": 9, "sleep": 1.5}
+
+# While thinking, the cat alternates between crepes and its laptop: two crepe
+# flips, then the laptop for as long, and so on. Successive thinking periods
+# start one way, then the other.
+THINK_PERIOD = 2 * len(sprites.ANIMATIONS["think"]) / FPS["think"]  # seconds
 
 BUBBLE_COLOR = {"question": "#E8590C", "done": "#2F9E44"}
 
@@ -126,6 +173,37 @@ def pixmap(name, coat, activity, mirror, scale):
             image.scaled(image.width() * scale, image.height() * scale)
         )
     return _pixmaps[key]
+
+
+def new_kitten(agent_type, number):
+    """A kitten that starts thinking. number shifts its crepes/laptop turns, so
+    that neighbouring kittens do not toss their crepes all at once."""
+    return {
+        "type": agent_type,
+        "activity": "think",
+        "think_since": time.monotonic(),
+        "think_count": number,
+    }
+
+
+def set_kitten_activity(kitten, activity):
+    if activity == "think" and kitten["activity"] != "think":
+        kitten["think_count"] += 1
+        kitten["think_since"] = time.monotonic()
+    kitten["activity"] = activity
+
+
+def kitten_frame(kitten, number, now):
+    """(sprite, crepe in the air or None) of a kitten: like the cat, a thinking
+    kitten swaps its laptop for a frying pan now and then."""
+    if kitten["activity"] == "think":
+        elapsed = now - kitten["think_since"]
+        if (kitten["think_count"] + int(elapsed / THINK_PERIOD)) % 2 == 1:
+            frames = sprites.ANIMATIONS["think"]
+            index = int(elapsed * FPS["think"])
+            return frames[index % len(frames)], sprites.CREPE_FLIGHT[index % len(sprites.CREPE_FLIGHT)]
+    frames = sprites.ANIMATIONS["work"]
+    return frames[(int(now * FPS["work"]) + number) % len(frames)], None
 
 
 def describe_tool(tool, detail):
@@ -166,6 +244,8 @@ class Cat(QWidget):
         self.activity = "think"
         self.kittens = {}  # agent id -> {"type", "activity"}
         self.since = time.monotonic()
+        self.think_count = 0  # thinking periods so far (crepes or laptop first)
+        self.think_since = self.since  # start of the current thinking period
         self.seen = time.monotonic()
         self.follows = False  # follows the mouse
         self.running = False
@@ -205,13 +285,23 @@ class Cat(QWidget):
     # --- State --------------------------------------------------------------
 
     def set_state(self, state, text="", activity="think"):
+        thinking = state == "work" and activity == "think"
+        if thinking and not self.thinking():
+            self.think_count += 1
+            self.think_since = time.monotonic()
         if state != self.state:
             self.since = time.monotonic()
-            if state in ("question", "done"):
-                self.follows = bool(SETTINGS["follow_mouse"])
-            else:
-                self.follows = False
+            setting = FOLLOW_SETTING.get(state)
+            self.follows = bool(setting and SETTINGS[setting])
         self.state, self.text, self.activity = state, text, activity
+
+    def thinking(self):
+        return self.state == "work" and self.activity == "think"
+
+    def flipping_crepes(self):
+        """While thinking: crepes or laptop, alternately (see THINK_PERIOD)."""
+        turns = int((time.monotonic() - self.think_since) / THINK_PERIOD)
+        return (self.think_count + turns) % 2 == 1
 
     def acknowledge(self):
         """Click on the cat: it stops following the mouse and goes back home."""
@@ -274,7 +364,11 @@ class Cat(QWidget):
     # --- Drawing ------------------------------------------------------------
 
     def animation(self):
-        return "run" if self.running else self.state
+        if self.running:
+            return "run"
+        if self.thinking() and self.flipping_crepes():
+            return "think"  # thinking: the cat flips a crepe (or types, alternately)
+        return self.state
 
     def bubble_lines(self):
         """Text lines of the bubble, or an empty list when there is nothing to say."""
@@ -305,15 +399,24 @@ class Cat(QWidget):
         """Redraw the window when what it shows has changed."""
         animation = self.animation()
         frames = sprites.ANIMATIONS[animation]
-        index = int(time.monotonic() * FPS[animation])
+        if animation == "think":
+            # Counted from the start of the thinking period: every series of
+            # crepes starts with a throw, never in the middle of a flight.
+            index = int((time.monotonic() - self.think_since) * FPS[animation])
+        else:
+            index = int(time.monotonic() * FPS[animation])
         lines = self.bubble_lines()
+        now = time.monotonic()
         signature = (
             animation,
             index,
             self.mirror,
             self.activity,
             tuple(lines),
-            tuple((k["type"], k["activity"]) for k in self.kittens.values()),
+            tuple(
+                (k["type"], k["activity"], kitten_frame(k, i, now))
+                for i, k in enumerate(self.kittens.values())
+            ),
         )
         if signature == self.signature and not force:
             return
@@ -354,6 +457,18 @@ class Cat(QWidget):
         y = HEIGHT - image.height() - jump
         painter.drawPixmap(x, y, image)
 
+        # The flying crepe (thinking)
+        if animation == "think":
+            flight = sprites.CREPE_FLIGHT[self.index % len(sprites.CREPE_FLIGHT)]
+            if flight:
+                name, column, line, flipped = flight
+                width = len(sprites.IMAGES[name][0])
+                if self.mirror:  # the cat looks the other way
+                    column = (image.width() // S - 2) - column - width
+                    flipped = not flipped
+                crepe = pixmap(name, self.coat, self.activity, flipped, S)
+                painter.drawPixmap(x + column * S, y + line * S, crepe)
+
         # The symbols above the cat
         top = CAT_TOP
         if animation == "sleep":
@@ -373,12 +488,21 @@ class Cat(QWidget):
                 if phase < 5:
                     self.draw_symbol(painter, "!", (6 + i * 3) * S, top - phase * S, color, S2)
 
-        # The kittens (one per running subagent)
-        for i, kitten in enumerate(list(self.kittens.values())[:MAX_KITTENS]):
+        # The kittens (one per running subagent), back rows first so that the
+        # front ones sit over them
+        kittens = list(self.kittens.values())
+        now = time.monotonic()
+        for i, x, row in reversed(kitten_places(len(kittens))):
+            kitten = kittens[i]
             coat = pick(sprites.KITTEN_COATS, kitten["type"] or "agent")
-            name = sprites.ANIMATIONS["work"][(self.index + i) % 2]
+            name, flight = kitten_frame(kitten, i, now)
             small = pixmap(name, coat, kitten["activity"], False, S2)
-            painter.drawPixmap(CAT_W + 4 + i * KITTEN_W, HEIGHT - small.height(), small)
+            y = HEIGHT - small.height() - row * KITTEN_ROW_STEP
+            painter.drawPixmap(x, y, small)
+            if flight:  # the kitten's crepe, in the air
+                crepe, column, line, flipped = flight
+                crepe = pixmap(crepe, coat, kitten["activity"], flipped, S2)
+                painter.drawPixmap(x + column * S2, y + line * S2, crepe)
 
         # The bubble
         if self.lines:
@@ -447,6 +571,21 @@ class Cat(QWidget):
         menu.addAction("Send this cat home", self.reset_home)
         menu.addAction("Dismiss this cat", lambda: self.app.remove(self.session))
         menu.addSeparator()
+        follow = menu.addMenu("Follow the mouse")
+        for state, label in (
+            ("question", "When Claude needs you"),
+            ("done", "When a task is finished"),
+        ):
+            action = follow.addAction(label)
+            action.setCheckable(True)
+            action.setChecked(bool(SETTINGS[FOLLOW_SETTING[state]]))
+            action.toggled.connect(lambda checked, state=state: self.app.set_follow(state, checked))
+        menu.addSeparator()
+        usage = menu.addAction("Usage cat")
+        usage.setCheckable(True)
+        usage.setChecked(usage_common.file_setting("usage_cat") is not False)
+        usage.toggled.connect(self.app.set_usage_cat)
+        menu.addAction("Usage cat only (hide session cats)", self.app.usage_only)
         menu.addAction("Quit we-always-need-cats", QApplication.instance().quit)
         menu.exec(position)
 
@@ -569,6 +708,29 @@ class App(QObject):
         area = QGuiApplication.primaryScreen().availableGeometry()
         return area.adjusted(0, 0, 0, -48)
 
+    def usage_only(self):
+        """Turn the session cats off (they no longer start) and leave."""
+        save_setting("session_cats", False)
+        QApplication.instance().quit()
+
+    def set_usage_cat(self, enabled):
+        """Show the usage cat again, or hide it for good (it leaves by itself
+        within a second, and the status line no longer starts it)."""
+        save_setting("usage_cat", enabled)
+        if enabled:
+            import usage_statusline
+
+            if not usage_statusline.program_is_running():
+                usage_statusline.start_program()
+
+    def set_follow(self, state, enabled):
+        """Menu setting, shared by every cat: follow the mouse in this state or not."""
+        save_setting(FOLLOW_SETTING[state], enabled)
+        if not enabled:
+            for cat in self.cats.values():
+                if cat.state == state:
+                    cat.follows = False
+
     def follower_order(self, cat):
         followers = sorted((c for c in self.cats.values() if c.follows), key=lambda c: c.rank)
         return followers.index(cat) if cat in followers else 0
@@ -615,6 +777,9 @@ class App(QObject):
     def handle(self, m):
         log(json.dumps(m, ensure_ascii=False))
         event, session = m.get("ev", ""), m.get("sid", "")
+        if event == "Quit":  # sent by the usage cat when the session cats are turned off
+            QApplication.instance().quit()
+            return
         if not session:
             return
         if event == "SessionEnd":
@@ -631,7 +796,7 @@ class App(QObject):
 
         if event == "SubagentStart":
             key = agent or f"agent-{len(cat.kittens)}"
-            cat.kittens[key] = {"type": m.get("agent_type", ""), "activity": "think"}
+            cat.kittens[key] = new_kitten(m.get("agent_type", ""), len(cat.kittens))
         elif event == "SubagentStop":
             if agent in cat.kittens:
                 del cat.kittens[agent]
@@ -639,13 +804,13 @@ class App(QObject):
                 cat.kittens.pop(next(iter(cat.kittens)))
         elif agent:
             # Subagent event: only its kitten changes activity.
-            kitten = cat.kittens.setdefault(
-                agent, {"type": m.get("agent_type", ""), "activity": "think"}
-            )
+            if agent not in cat.kittens:
+                cat.kittens[agent] = new_kitten(m.get("agent_type", ""), len(cat.kittens))
+            kitten = cat.kittens[agent]
             if event == "PreToolUse":
-                kitten["activity"] = describe_tool(tool, "")[1]
+                set_kitten_activity(kitten, describe_tool(tool, "")[1])
             elif event in ("PostToolUse", "PostToolUseFailure"):
-                kitten["activity"] = "think"
+                set_kitten_activity(kitten, "think")
         elif event == "UserPromptSubmit":
             cat.set_state("work", "thinking")
         elif event == "PreToolUse":
@@ -718,6 +883,14 @@ class App(QObject):
 
 
 def main():
+    if not SETTINGS.get("session_cats", True):
+        return 0  # usage cat only (setting session_cats)
+    lock = open(LOCK, "w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return 0  # the program is already running
+
     application = QApplication(sys.argv)
     application.setApplicationName(APP_NAME)
     application.setQuitOnLastWindowClosed(False)

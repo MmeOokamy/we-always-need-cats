@@ -8,7 +8,8 @@ Claude Code session is doing.
 *Français : [README.fr.md](README.fr.md)*
 
 - One cat per open Claude Code session, each with its own coat.
-- One kitten per running subagent, in a color of its own.
+- One kitten per running subagent, as many kittens as subagents, in a color of
+  its own for each agent type.
 - A speech bubble shows the project and the current action.
 - A separate cat watches the Claude Code usage limits (see
   [The usage cat](#the-usage-cat)).
@@ -19,21 +20,44 @@ Claude Code session is doing.
 |---|---|
 | Session open, nothing running | Sits in its spot, then falls asleep after 3 minutes |
 | Claude is working | Types on its laptop; the bubble describes the action |
-| Subagents running | Kittens work next to it |
+| Claude is thinking (between two actions) | Flips crepes in a frying pan, alternating with its laptop |
+| Subagents running | Kittens work next to it, one per subagent |
 | A question or a permission prompt | Runs to the mouse and follows it, orange bubble |
 | Task finished | Runs to the mouse, jumps for joy, green bubble; goes home after 30 seconds |
 | Session closed | The cat disappears |
 
 The laptop screen is colored after the activity: green while writing a file,
 blue while reading or searching, yellow for a command, purple for the web, pink
-while delegating to an agent, light grey while thinking.
+while delegating to an agent, light grey while thinking. While Claude thinks,
+the cat also swaps its laptop for a frying pan now and then: it tosses a crepe,
+which turns over in the air before landing back in the pan. It changes every
+two crepes during a long thinking period, and one thinking period out of two
+starts with the crepes.
+
+The kittens sit on the right of the cat, in rows of three, up to three rows
+stacked a little over each other. Past nine subagents, they squeeze together on
+their rows: every subagent keeps its kitten. The bubble gives the number of
+subagents and their types. Like the cat, a kitten whose subagent is thinking
+alternates between its laptop and its crepe pan, each at its own pace.
 
 ## Mouse
 
 - Left click on the cat: it stops following the mouse and goes back home.
 - Drag the cat: drop it somewhere else, which becomes its new home.
 - Hover: shows the project name of a resting cat.
-- Right click: send the cat home, dismiss that cat, or quit the program.
+- Right click: send the cat home, dismiss that cat, choose when the cats follow
+  the mouse, show or hide the usage cat (**Usage cat** checkbox, see
+  [Hiding the usage cat](#hiding-the-usage-cat)), keep the usage cat only (see
+  [Usage cat only](#usage-cat-only)), or quit the program.
+
+The **Follow the mouse** submenu has two checkboxes, shared by every session
+cat and saved in `config.json`:
+
+- **When Claude needs you**: question, permission prompt, plan to approve.
+- **When a task is finished**.
+
+When unchecked, the cat stays in its spot in that situation; the bubble still
+shows what is happening. Unchecking stops the cats that are following right now.
 
 Clicks pass through everything that is transparent around the cat.
 
@@ -62,7 +86,33 @@ The cat follows the clock: once the reset time has passed, the gauge goes back
 to zero even if Claude Code has sent nothing since.
 
 Mouse: hover or left click for the bubble, drag to move it (its spot is
-remembered), right click to send it home or quit the program.
+remembered), right click to send it home, show or hide the session cats
+(**Session cats** checkbox), hide it for good (see
+[Hiding the usage cat](#hiding-the-usage-cat)), or quit the program. Quitting
+only hides it until Claude Code's next answer: the status line starts it again.
+
+### Hiding the usage cat
+
+**Hide the usage cat for good** (right click on the usage cat) closes it and
+stops the status line from starting it again. The choice is saved in
+`config.json` (`usage_cat: false`). The status line keeps printing and saving
+the figures (handy when another display reads them).
+
+To bring it back: tick **Usage cat** in a session cat's right-click menu, which
+starts it at once, or set `"usage_cat": true` back in `config.json` (it comes
+back at Claude Code's next answer). Unticking **Usage cat** in a session cat's
+menu hides it too.
+
+### Usage cat only
+
+To keep the usage cat without the session cats, either:
+
+- untick **Session cats** in the usage cat's right-click menu, or pick
+  **Usage cat only** in a session cat's menu: the session cats leave at once
+  and no longer come back. Tick the box again to bring them back at the next
+  Claude Code event. The choice is saved in `config.json` (`session_cats`);
+- or install the usage cat alone: `python3 install.py --usage-only` (status
+  line only, no hooks; removes the hooks of a previous install).
 
 The figures come through the Claude Code status line, which also shows a
 summary:
@@ -120,7 +170,7 @@ the next Claude Code event.
 
 It also registers the status line of the usage cat. A status line that is
 already set is kept and the usage cat is not installed; `--force` replaces it.
-`--no-usage` installs the session cats only.
+`--no-usage` installs the session cats only, `--usage-only` the usage cat only.
 
 To install them for a single project instead:
 
@@ -138,6 +188,8 @@ next event.
 {
   "scale": 4,
   "follow_mouse": true,
+  "follow_on_question": true,
+  "follow_on_done": true,
   "follow_after_done": 30,
   "sleep_delay": 180,
   "speed": 800,
@@ -149,12 +201,17 @@ next event.
   "critical": 95,
   "notify_seconds": 12,
   "keep_alive": false,
-  "statusline": true
+  "statusline": true,
+  "session_cats": true,
+  "usage_cat": true
 }
 ```
 
 - `scale`: size of the cat (3 for smaller, 5 or 6 for bigger).
 - `follow_mouse`: set to `false` to keep the cat in its spot at all times.
+  Default value of the next two settings.
+- `follow_on_question`, `follow_on_done`: follow the mouse when Claude needs
+  you, and after a finished task. Also set from the right-click menu.
 - `follow_after_done`: seconds spent following the mouse after a finished task.
 - `sleep_delay`: seconds of idling before the cat falls asleep.
 - `speed`: running speed, in pixels per second.
@@ -170,6 +227,9 @@ For the usage cat (which also follows `scale`):
 - `keep_alive`: `true` to keep the cat after Claude Code is closed (handy while
   waiting for a reset). Otherwise it leaves with the last session.
 - `statusline`: `false` to print nothing in the status line.
+- `session_cats`: `false` to keep the usage cat only (also set from the menus).
+- `usage_cat`: `false` to hide the usage cat for good (also set from the menus);
+  the status line keeps working.
 
 ## How it works
 
@@ -183,8 +243,8 @@ For the usage cat (which also follows `scale`):
 - `sprites.py` holds the drawings and the colors.
 - `usage_statusline.py` is called by Claude Code at every status line refresh.
   It receives the limits of the account (`rate_limits`), saves them to
-  `~/.cache/usage-cat/state.json`, starts `usage_cat.py` if it is not running,
-  and prints the summary.
+  `~/.cache/usage-cat/state.json`, starts `usage_cat.py` if it is not running
+  and has not been hidden (`usage_cat`), and prints the summary.
 - `usage_cat.py` shows the usage cat and reads that file again every second;
   `usage_common.py` holds its settings, thresholds and texts.
 - `install.py` registers and removes the hooks and the status line.

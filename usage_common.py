@@ -12,6 +12,11 @@ import time
 _DEMO = bool(os.environ.get("USAGE_CAT_DEMO"))
 APP_NAME = "usage-cat" + ("-demo" if _DEMO else "")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+RUNTIME = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
+LOCK = os.path.join(RUNTIME, f"{APP_NAME}.lock")
+# Socket of the session cats (cats.py), used to ask them to leave.
+CATS_SOCKET = os.path.join(RUNTIME, "we-always-need-cats.sock")
+CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 CACHE = os.path.join(os.path.expanduser("~"), ".cache", APP_NAME)
 STATE = os.path.join(CACHE, "state.json")
 POSITION = os.path.join(CACHE, "position.json")
@@ -32,12 +37,55 @@ SETTINGS = {
     "notify_seconds": 12,  # how long the bubble stays up when a threshold is crossed
     "keep_alive": False,  # keep the cat on screen after the last Claude Code session ends
     "statusline": True,  # also print the usage in the Claude Code status line
+    "session_cats": True,  # false: usage cat only, hook.py no longer starts cats.py
+    "usage_cat": True,  # false: the status line no longer starts usage_cat.py
 }
 try:
-    with open(os.path.join(BASE_DIR, "config.json"), encoding="utf-8") as _f:
+    with open(CONFIG_FILE, encoding="utf-8") as _f:
         SETTINGS.update(json.load(_f))
 except (OSError, ValueError):
     pass
+
+
+def save_setting(key, value):
+    """Write one value to config.json, keeping the others (the file is shared
+    by cats.py, usage_cat.py and hook.py). Raises OSError if it cannot be saved."""
+    SETTINGS[key] = value
+    try:
+        with open(CONFIG_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            data = {}
+    except (OSError, ValueError):
+        data = {}
+    data[key] = value
+    temporary = f"{CONFIG_FILE}.{os.getpid()}.tmp"
+    with open(temporary, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    os.replace(temporary, CONFIG_FILE)
+
+
+def file_setting(key):
+    """Value of one setting as config.json holds it now (it may have been
+    changed by another program since this one started)."""
+    try:
+        with open(CONFIG_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return SETTINGS[key]
+    return data.get(key, SETTINGS[key]) if isinstance(data, dict) else SETTINGS[key]
+
+
+def dismiss_session_cats():
+    """Ask cats.py, if it is running, to close every session cat and quit."""
+    import socket
+
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as s:
+            s.sendto(json.dumps({"ev": "Quit"}).encode(), CATS_SOCKET)
+    except OSError:
+        pass  # not running
 
 # Rate limit windows reported by Claude Code, as named in its status line data.
 WINDOWS = ("five_hour", "seven_day")
@@ -69,6 +117,8 @@ _TEXTS = {
         "status": "{label} {pct} %",
         "menu_home": "Remettre le chat à sa place",
         "menu_quit": "Quitter usage-cat",
+        "menu_session_cats": "Chats de session",
+        "menu_hide": "Masquer le chat d'usage définitivement",
     },
     "en": {
         "title": "Claude Code usage",
@@ -85,6 +135,8 @@ _TEXTS = {
         "status": "{label} {pct}%",
         "menu_home": "Send the cat home",
         "menu_quit": "Quit usage-cat",
+        "menu_session_cats": "Session cats",
+        "menu_hide": "Hide the usage cat for good",
     },
 }
 TEXT = _TEXTS.get(str(SETTINGS["lang"]).lower(), _TEXTS["fr"])

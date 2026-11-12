@@ -43,7 +43,18 @@ def start_program():
     return True
 
 
+def session_cats_enabled():
+    """Setting session_cats of config.json (false: usage cat only)."""
+    try:
+        with open(os.path.join(BASE_DIR, "config.json"), encoding="utf-8") as f:
+            return json.load(f).get("session_cats", True) is not False
+    except (OSError, ValueError, AttributeError):
+        return True
+
+
 def main():
+    if not session_cats_enabled():
+        return
     try:
         e = json.load(sys.stdin)
     except ValueError:

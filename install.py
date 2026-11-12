@@ -9,6 +9,7 @@ status line, for the usage cat (usage_statusline.py).
     python3 install.py --settings FILE use another settings file
                                        (e.g. .claude/settings.json of a project)
     python3 install.py --no-usage      session cats only, no usage cat
+    python3 install.py --usage-only    usage cat only, no session cats (no hooks)
     python3 install.py --force         replace a status line that is already set
 
 The settings file is copied to <name>.backup-we-always-need-cats before the
@@ -146,6 +147,19 @@ def install_status_line(settings, force):
     return "Status line installed: the usage cat shows up at its next refresh."
 
 
+def install_usage_only(path, force=False):
+    """Status line only; removes this project's hooks if they were installed."""
+    settings = load(path)
+    dropped = strip_ours(settings)
+    message = install_status_line(settings, force)
+    if not is_our_status_line(settings.get("statusLine")):
+        sys.exit(message)
+    save(path, settings)
+    if dropped:
+        print(f"{dropped} hooks removed from {path}: no session cats.")
+    print(message)
+
+
 def install(path, usage=True, force=False):
     if not os.path.exists(HOOK):
         sys.exit(f"hook.py not found next to this script ({HOOK}).")
@@ -188,14 +202,23 @@ def main():
     parser.add_argument(
         "--no-usage", action="store_true", help="do not install the usage cat (status line)"
     )
+    parser.add_argument(
+        "--usage-only",
+        action="store_true",
+        help="install the usage cat only (status line), without the session cats (hooks)",
+    )
     parser.add_argument("--force", action="store_true", help="replace an existing status line")
     parser.add_argument(
         "--settings", default=DEFAULT_SETTINGS, help=f"settings file (default: {DEFAULT_SETTINGS})"
     )
     args = parser.parse_args()
     path = os.path.abspath(os.path.expanduser(args.settings))
+    if args.usage_only and args.no_usage:
+        parser.error("--usage-only and --no-usage cannot be used together")
     if args.uninstall:
         uninstall(path)
+    elif args.usage_only:
+        install_usage_only(path, force=args.force)
     else:
         install(path, usage=not args.no_usage, force=args.force)
 
