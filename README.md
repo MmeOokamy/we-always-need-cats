@@ -33,7 +33,17 @@ while delegating to an agent, light grey while thinking.
 - Left click on the cat: it stops following the mouse and goes back home.
 - Drag the cat: drop it somewhere else, which becomes its new home.
 - Hover: shows the project name of a resting cat.
-- Right click: send the cat home, dismiss that cat, or quit the program.
+- Right click: send the cat home, dismiss that cat, choose when the cats follow
+  the mouse, or quit the program.
+
+The **Follow the mouse** submenu has two checkboxes, shared by every session
+cat and saved in `config.json`:
+
+- **When Claude needs you**: question, permission prompt, plan to approve.
+- **When a task is finished**.
+
+When unchecked, the cat stays in its spot in that situation; the bubble still
+shows what is happening. Unchecking stops the cats that are following right now.
 
 Clicks pass through everything that is transparent around the cat.
 
@@ -129,6 +139,8 @@ next event.
 {
   "scale": 4,
   "follow_mouse": true,
+  "follow_on_question": true,
+  "follow_on_done": true,
   "follow_after_done": 30,
   "sleep_delay": 180,
   "speed": 800,
@@ -146,6 +158,9 @@ next event.
 
 - `scale`: size of the cat (3 for smaller, 5 or 6 for bigger).
 - `follow_mouse`: set to `false` to keep the cat in its spot at all times.
+  Default value of the next two settings.
+- `follow_on_question`, `follow_on_done`: follow the mouse when Claude needs
+  you, and after a finished task. Also set from the right-click menu.
 - `follow_after_done`: seconds spent following the mouse after a finished task.
 - `sleep_delay`: seconds of idling before the cat falls asleep.
 - `speed`: running speed, in pixels per second.

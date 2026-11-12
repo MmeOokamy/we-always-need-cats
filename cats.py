@@ -58,17 +58,48 @@ DBUS_INTERFACE = "org.weneedcats.Cursor"
 
 SETTINGS = {
     "scale": 4,  # size of one drawing pixel, in screen pixels
-    "follow_mouse": True,  # the cat walks to the mouse (question, finished task)
+    "follow_mouse": True,  # default of the two settings below
+    "follow_on_question": None,  # follow the mouse when Claude needs you (None: follow_mouse)
+    "follow_on_done": None,  # follow the mouse when a task is finished (None: follow_mouse)
     "follow_after_done": 30,  # seconds spent following the mouse after a finished task
     "sleep_delay": 180,  # seconds of idling before the cat falls asleep
     "speed": 800,  # running speed, in pixels per second
     "log": False,  # write received events to ~/.cache/we-always-need-cats/cats.log
 }
+CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 try:
-    with open(os.path.join(BASE_DIR, "config.json"), encoding="utf-8") as _f:
+    with open(CONFIG_FILE, encoding="utf-8") as _f:
         SETTINGS.update(json.load(_f))
 except (OSError, ValueError):
     pass
+for _key in ("follow_on_question", "follow_on_done"):
+    if SETTINGS[_key] is None:
+        SETTINGS[_key] = bool(SETTINGS["follow_mouse"])
+
+# Cat state -> setting deciding whether the cat follows the mouse in that state.
+FOLLOW_SETTING = {"question": "follow_on_question", "done": "follow_on_done"}
+
+
+def save_setting(key, value):
+    """Change one setting and write it to config.json, keeping the other values
+    (the file is shared with the usage cat)."""
+    SETTINGS[key] = value
+    try:
+        with open(CONFIG_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            data = {}
+    except (OSError, ValueError):
+        data = {}
+    data[key] = value
+    try:
+        temporary = CONFIG_FILE + ".tmp"
+        with open(temporary, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+            f.write("\n")
+        os.replace(temporary, CONFIG_FILE)
+    except OSError as error:
+        log("settings not saved:", error)
 
 S = max(1, int(SETTINGS["scale"]))  # cat scale
 S2 = max(1, S // 2)  # kitten scale
@@ -191,10 +222,8 @@ class Cat(QWidget):
     def set_state(self, state, text="", activity="think"):
         if state != self.state:
             self.since = time.monotonic()
-            if state in ("question", "done"):
-                self.follows = bool(SETTINGS["follow_mouse"])
-            else:
-                self.follows = False
+            setting = FOLLOW_SETTING.get(state)
+            self.follows = bool(setting and SETTINGS[setting])
         self.state, self.text, self.activity = state, text, activity
 
     def acknowledge(self):
@@ -431,6 +460,16 @@ class Cat(QWidget):
         menu.addAction("Send this cat home", self.reset_home)
         menu.addAction("Dismiss this cat", lambda: self.app.remove(self.session))
         menu.addSeparator()
+        follow = menu.addMenu("Follow the mouse")
+        for state, label in (
+            ("question", "When Claude needs you"),
+            ("done", "When a task is finished"),
+        ):
+            action = follow.addAction(label)
+            action.setCheckable(True)
+            action.setChecked(bool(SETTINGS[FOLLOW_SETTING[state]]))
+            action.toggled.connect(lambda checked, state=state: self.app.set_follow(state, checked))
+        menu.addSeparator()
         menu.addAction("Quit we-always-need-cats", QApplication.instance().quit)
         menu.exec(position)
 
@@ -551,6 +590,14 @@ class App(QObject):
             )
         area = QGuiApplication.primaryScreen().availableGeometry()
         return area.adjusted(0, 0, 0, -48)
+
+    def set_follow(self, state, enabled):
+        """Menu setting, shared by every cat: follow the mouse in this state or not."""
+        save_setting(FOLLOW_SETTING[state], enabled)
+        if not enabled:
+            for cat in self.cats.values():
+                if cat.state == state:
+                    cat.follows = False
 
     def follower_order(self, cat):
         followers = sorted((c for c in self.cats.values() if c.follows), key=lambda c: c.rank)

@@ -34,8 +34,18 @@ pour le web, rose quand il délègue à un agent, gris clair quand il réfléchi
 - Clic gauche sur le chat : il arrête de suivre la souris et retourne à sa place.
 - Glisser le chat : le poser ailleurs, ce qui devient sa nouvelle place.
 - Survol : affiche le nom du projet d'un chat au repos.
-- Clic droit : remettre le chat à sa place, renvoyer ce chat, ou fermer le
-  programme.
+- Clic droit : remettre le chat à sa place, renvoyer ce chat, choisir quand les
+  chats suivent la souris, ou fermer le programme.
+
+Le sous-menu **Follow the mouse** contient deux cases à cocher, communes à tous
+les chats de session et enregistrées dans `config.json` :
+
+- **When Claude needs you** : question, demande d'autorisation, plan à valider.
+- **When a task is finished** : tâche terminée.
+
+Une fois décoché, le chat reste à sa place dans cette situation ; la bulle
+indique toujours ce qui se passe. Décocher arrête aussi les chats qui suivent
+la souris à ce moment-là.
 
 Les clics traversent tout ce qui est transparent autour du chat.
 
@@ -132,6 +142,8 @@ prochain événement.
 {
   "scale": 4,
   "follow_mouse": true,
+  "follow_on_question": true,
+  "follow_on_done": true,
   "follow_after_done": 30,
   "sleep_delay": 180,
   "speed": 800,
@@ -149,6 +161,9 @@ prochain événement.
 
 - `scale` : taille du chat (3 pour plus petit, 5 ou 6 pour plus grand).
 - `follow_mouse` : mettre `false` pour que le chat reste toujours à sa place.
+  Valeur par défaut des deux réglages suivants.
+- `follow_on_question`, `follow_on_done` : suivre la souris quand Claude a besoin
+  de vous, et après une tâche terminée. Se règlent aussi par le clic droit.
 - `follow_after_done` : secondes de suivi de la souris après une tâche terminée.
 - `sleep_delay` : secondes de repos avant qu'il s'endorme.
 - `speed` : vitesse de course, en pixels par seconde.
