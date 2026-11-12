@@ -499,6 +499,10 @@ class Cat(QWidget):
             action.setChecked(bool(SETTINGS[FOLLOW_SETTING[state]]))
             action.toggled.connect(lambda checked, state=state: self.app.set_follow(state, checked))
         menu.addSeparator()
+        usage = menu.addAction("Usage cat")
+        usage.setCheckable(True)
+        usage.setChecked(usage_common.file_setting("usage_cat") is not False)
+        usage.toggled.connect(self.app.set_usage_cat)
         menu.addAction("Usage cat only (hide session cats)", self.app.usage_only)
         menu.addAction("Quit we-always-need-cats", QApplication.instance().quit)
         menu.exec(position)
@@ -625,6 +629,16 @@ class App(QObject):
         """Turn the session cats off (they no longer start) and leave."""
         save_setting("session_cats", False)
         QApplication.instance().quit()
+
+    def set_usage_cat(self, enabled):
+        """Show the usage cat again, or hide it for good (it leaves by itself
+        within a second, and the status line no longer starts it)."""
+        save_setting("usage_cat", enabled)
+        if enabled:
+            import usage_statusline
+
+            if not usage_statusline.program_is_running():
+                usage_statusline.start_program()
 
     def set_follow(self, state, enabled):
         """Menu setting, shared by every cat: follow the mouse in this state or not."""

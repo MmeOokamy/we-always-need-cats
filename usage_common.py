@@ -34,6 +34,7 @@ SETTINGS = {
     "keep_alive": False,  # keep the cat on screen after the last Claude Code session ends
     "statusline": True,  # also print the usage in the Claude Code status line
     "session_cats": True,  # false: usage cat only, hook.py no longer starts cats.py
+    "usage_cat": True,  # false: the status line no longer starts usage_cat.py
 }
 try:
     with open(CONFIG_FILE, encoding="utf-8") as _f:
@@ -59,6 +60,17 @@ def save_setting(key, value):
         json.dump(data, f, indent=2, ensure_ascii=False)
         f.write("\n")
     os.replace(temporary, CONFIG_FILE)
+
+
+def file_setting(key):
+    """Value of one setting as config.json holds it now (it may have been
+    changed by another program since this one started)."""
+    try:
+        with open(CONFIG_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return SETTINGS[key]
+    return data.get(key, SETTINGS[key]) if isinstance(data, dict) else SETTINGS[key]
 
 
 def dismiss_session_cats():
@@ -102,6 +114,7 @@ _TEXTS = {
         "menu_home": "Remettre le chat à sa place",
         "menu_quit": "Quitter usage-cat",
         "menu_session_cats": "Chats de session",
+        "menu_hide": "Masquer le chat d'usage définitivement",
     },
     "en": {
         "title": "Claude Code usage",
@@ -119,6 +132,7 @@ _TEXTS = {
         "menu_home": "Send the cat home",
         "menu_quit": "Quit usage-cat",
         "menu_session_cats": "Session cats",
+        "menu_hide": "Hide the usage cat for good",
     },
 }
 TEXT = _TEXTS.get(str(SETTINGS["lang"]).lower(), _TEXTS["fr"])

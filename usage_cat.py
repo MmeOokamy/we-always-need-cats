@@ -162,6 +162,15 @@ class UsageCat(QWidget):
         if not enabled:
             common.dismiss_session_cats()
 
+    def hide_for_good(self):
+        """Leave and stay hidden: the status line no longer starts the cat
+        (setting usage_cat, turned back on from a session cat's menu)."""
+        try:
+            common.save_setting("usage_cat", False)
+        except OSError:
+            return
+        QApplication.instance().quit()
+
     def reset_home(self):
         self.home = None
         self.save_home()
@@ -410,6 +419,7 @@ class UsageCat(QWidget):
         session_cats.setChecked(bool(SETTINGS["session_cats"]))
         session_cats.toggled.connect(self.set_session_cats)
         menu.addSeparator()
+        menu.addAction(TEXT["menu_hide"], self.hide_for_good)
         menu.addAction(TEXT["menu_quit"], QApplication.instance().quit)
         menu.exec(position)
 
@@ -463,6 +473,9 @@ def main():
         preview(sys.argv[position + 1] if len(sys.argv) > position + 1 else "usage.png")
         return 0
 
+    if common.file_setting("usage_cat") is False:
+        print("usage-cat est masqué (usage_cat: false dans config.json)")
+        return 0
     lock = open(common.LOCK, "w")
     try:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -478,7 +491,8 @@ def main():
 
     def watch():
         cat.poll()
-        if cat.should_quit(time.time()):
+        # Hidden from a session cat's menu: leave at once.
+        if cat.should_quit(time.time()) or common.file_setting("usage_cat") is False:
             application.quit()
 
     watcher = QTimer()

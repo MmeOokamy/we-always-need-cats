@@ -82,7 +82,22 @@ zéro même si Claude Code n'a rien envoyé depuis.
 
 Souris : survol ou clic gauche pour la bulle, glisser pour le déplacer (sa
 place est retenue), clic droit pour le remettre à sa place, afficher ou masquer
-les chats de session (case **Chats de session**), ou fermer le programme.
+les chats de session (case **Chats de session**), le masquer définitivement
+(voir [Masquer le chat d'usage](#masquer-le-chat-dusage)), ou fermer le
+programme. Fermer le programme ne le masque que jusqu'à la prochaine réponse de
+Claude Code : la status line le relance.
+
+### Masquer le chat d'usage
+
+**Masquer le chat d'usage définitivement** (clic droit sur le chat d'usage) le
+ferme et empêche la status line de le relancer. Le choix est enregistré dans
+`config.json` (`usage_cat: false`). La status line continue d'afficher et
+d'enregistrer les chiffres (utile si un autre affichage les lit).
+
+Pour le faire revenir : cocher **Usage cat** dans le menu (clic droit) d'un chat
+de session, ce qui le relance aussitôt, ou remettre `"usage_cat": true` dans
+`config.json` (il revient à la prochaine réponse de Claude Code). La case
+**Usage cat** d'un chat de session le masque aussi.
 
 ### Chat d'usage seul
 
@@ -176,7 +191,8 @@ prochain événement.
   "notify_seconds": 12,
   "keep_alive": false,
   "statusline": true,
-  "session_cats": true
+  "session_cats": true,
+  "usage_cat": true
 }
 ```
 
@@ -202,6 +218,8 @@ Pour le chat d'usage (qui suit aussi `scale`) :
 - `statusline` : `false` pour ne rien écrire dans la status line.
 - `session_cats` : `false` pour ne garder que le chat d'usage (se règle aussi
   par les menus).
+- `usage_cat` : `false` pour masquer le chat d'usage de façon permanente (se
+  règle aussi par les menus) ; la status line reste active.
 
 ## Fonctionnement
 

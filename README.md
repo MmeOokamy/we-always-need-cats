@@ -79,7 +79,21 @@ to zero even if Claude Code has sent nothing since.
 
 Mouse: hover or left click for the bubble, drag to move it (its spot is
 remembered), right click to send it home, show or hide the session cats
-(**Session cats** checkbox), or quit the program.
+(**Session cats** checkbox), hide it for good (see
+[Hiding the usage cat](#hiding-the-usage-cat)), or quit the program. Quitting
+only hides it until Claude Code's next answer: the status line starts it again.
+
+### Hiding the usage cat
+
+**Hide the usage cat for good** (right click on the usage cat) closes it and
+stops the status line from starting it again. The choice is saved in
+`config.json` (`usage_cat: false`). The status line keeps printing and saving
+the figures (handy when another display reads them).
+
+To bring it back: tick **Usage cat** in a session cat's right-click menu, which
+starts it at once, or set `"usage_cat": true` back in `config.json` (it comes
+back at Claude Code's next answer). Unticking **Usage cat** in a session cat's
+menu hides it too.
 
 ### Usage cat only
 
@@ -171,7 +185,8 @@ next event.
   "notify_seconds": 12,
   "keep_alive": false,
   "statusline": true,
-  "session_cats": true
+  "session_cats": true,
+  "usage_cat": true
 }
 ```
 
@@ -196,6 +211,8 @@ For the usage cat (which also follows `scale`):
   waiting for a reset). Otherwise it leaves with the last session.
 - `statusline`: `false` to print nothing in the status line.
 - `session_cats`: `false` to keep the usage cat only (also set from the menus).
+- `usage_cat`: `false` to hide the usage cat for good (also set from the menus);
+  the status line keeps working.
 
 ## How it works
 
