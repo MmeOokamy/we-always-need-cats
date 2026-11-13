@@ -185,12 +185,17 @@ python3 install.py --settings /chemin/du/projet/.claude/settings.json
 ## Mises à jour
 
 Les chats vérifient une fois par jour si une nouvelle version est publiée sur
-GitHub. Quand c'est le cas, la bulle d'un chat survolé l'indique (« update
+GitHub ([releases](https://github.com/MmeOokamy/we-always-need-cats/releases)).
+Seules les versions publiées sont proposées, pas chaque changement fusionné
+entre deux versions. Quand une nouvelle version est publiée, la bulle d'un chat survolé l'indique (« update
 available »), et le sous-menu **Updates** du clic droit (ou **Mises à jour**
 sur le chat d'usage) donne :
 
-- l'état : jamais vérifié, à jour (avec l'heure de la vérification), mise à
-  jour disponible avec le nombre de changements, ou vérification impossible ;
+- la version installée (« 1.0.0+ » : plus récente que la version 1.0.0,
+  mise à jour à la main avec `git pull`) ;
+- l'état : jamais vérifié, à jour (avec l'heure de la vérification), nouvelle
+  version disponible avec le nombre de changements, ou vérification
+  impossible ;
 - **What changed** / **Nouveautés** : la liste des changements à venir ;
 - **Check for updates** / **Vérifier les mises à jour** : vérifier tout de
   suite ;
@@ -206,12 +211,28 @@ python3 updates.py           # vérifie, puis met à jour s'il y a du nouveau
 python3 updates.py --check   # vérifie seulement
 ```
 
-La mise à jour suit la branche du clone (`git fetch`, puis `git merge
---ff-only`) : elle n'écrase jamais rien. Avec des modifications locales ou des
-commits locaux, elle s'arrête et indique de mettre à jour à la main. Il faut
+La mise à jour avance le clone jusqu'à la dernière version publiée (`git fetch
+--tags`, puis `git merge --ff-only vX.Y.Z`) : elle n'écrase jamais rien. Avec
+des modifications locales ou des commits absents de GitHub, elle s'arrête et
+indique de mettre à jour à la main. Il faut
 avoir installé les chats avec `git clone` ; `config.json` n'est pas touché.
 Une nouvelle version qui change les hooks ou la status line le précise dans ses
 changements : relancer alors `python3 install.py`.
+
+### Publier une version
+
+Les versions sont des tags `vX.Y.Z` sur `main` (version sémantique : le dernier
+nombre pour une correction, celui du milieu pour une nouveauté, le premier pour
+un changement qui demande d'agir, comme relancer `install.py`) :
+
+```bash
+git switch main && git pull
+git tag -a v1.1.0 -m "v1.1.0"
+git push origin v1.1.0
+```
+
+Puis, sur GitHub, **Releases**, **Draft a new release** : choisir le tag et
+décrire les changements. Les chats proposent la version dès le push du tag.
 
 ## Réglages
 
