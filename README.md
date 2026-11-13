@@ -20,7 +20,7 @@ Claude Code session is doing.
 |---|---|
 | Session open, nothing running | Sits in its spot, then falls asleep after 3 minutes |
 | Claude is working | Types on its laptop; the bubble describes the action |
-| Claude is thinking (between two actions) | Flips crepes in a frying pan, alternating with its laptop |
+| Claude is thinking (between two actions) | Takes turns: its laptop, crepes in a frying pan, a ball of yarn, a Rubik's cube |
 | Subagents running | Kittens work next to it, one per subagent |
 | A question or a permission prompt, or an answer from Claude ending with a question | Runs to the mouse and follows it, orange bubble |
 | Task finished | Runs to the mouse, jumps for joy, green bubble; goes home after 30 seconds |
@@ -29,10 +29,12 @@ Claude Code session is doing.
 The laptop screen is colored after the activity: green while writing a file,
 blue while reading or searching, yellow for a command, purple for the web, pink
 while delegating to an agent, light grey while thinking. While Claude thinks,
-the cat also swaps its laptop for a frying pan now and then: it tosses a crepe,
-which turns over in the air before landing back in the pan. It changes every
-two crepes during a long thinking period, and one thinking period out of two
-starts with the crepes.
+the cat takes turns, a few seconds each: its laptop, then a frying pan, where
+it tosses a crepe that turns over in the air before landing back in the pan,
+then a ball of yarn: it raises its paw, hits the ball, which rolls to its tail,
+and the tail sends it back; then a Rubik's cube, whose rows it turns until the
+face is all green, before lifting it, proud of itself. Each thinking period
+starts with the next turn.
 
 An answer from Claude that ends with a question (a question mark in its last
 paragraph, outside code, links and quotes) counts as a question rather than a
@@ -43,7 +45,8 @@ The kittens sit on the right of the cat, in rows of three, up to three rows
 stacked a little over each other. Past nine subagents, they squeeze together on
 their rows: every subagent keeps its kitten. The bubble gives the number of
 subagents and their types. Like the cat, a kitten whose subagent is thinking
-alternates between its laptop and its crepe pan, each at its own pace.
+takes turns with its laptop, its crepe pan, its ball of yarn and its Rubik's
+cube, each at its own pace.
 
 ## Mouse
 
