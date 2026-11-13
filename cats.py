@@ -41,6 +41,7 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import QApplication, QMenu, QWidget
 
+import popup
 import sprites
 import updates
 import usage_common
@@ -576,7 +577,7 @@ class Cat(QWidget):
         menu.addSeparator()
         self.app.updater.add_menu(menu)
         menu.addAction("Quit we-always-need-cats", QApplication.instance().quit)
-        menu.exec(position)
+        popup.show_menu(menu, position)
 
     def reset_home(self):
         self.home = None
