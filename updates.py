@@ -8,13 +8,14 @@ The cats use the same functions: an automatic check once a day, and an
 "Updates" submenu in their right-click menu (state, what changed, check now,
 update and restart).
 
-The Windows cats follow their own branch (the clone's upstream, e.g.
-origin/windows), not the release tags of main: that branch carries the
-Windows-specific code, so an update tracks it rather than the shared releases.
+The Windows cats have their own releases, tagged win-vX.Y.Z on the windows
+branch (which carries the Windows-specific code), kept apart from the vX.Y.Z
+releases of main. Only these Windows releases are offered, not every change
+pushed to the branch between two of them.
 
-An update never overwrites anything: it is a fast-forward of the clone to its
-upstream branch. With local changes or local commits, it stops and says so.
-After an update, the running cats restart by themselves on the new version
+An update never overwrites anything: it is a fast-forward of the clone to the
+latest Windows release. With local changes or local commits, it stops and says
+so. After an update, the running cats restart by themselves on the new version
 (see restart_wanted).
 """
 
@@ -31,9 +32,16 @@ STATE = os.path.join(CACHE, "updates.json")  # result of the last check
 UPDATED = os.path.join(CACHE, "updated")  # touched after an update: restart
 CHECK_EVERY = 24 * 3600  # automatic check, in seconds
 GIT_TIMEOUT = 30
-RELEASE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")  # release tags: v1.2.3
+RELEASE = re.compile(r"^win-v(\d+)\.(\d+)\.(\d+)$")  # Windows release tags: win-v1.2.3
+TAG_GLOB = "win-v[0-9]*.[0-9]*.[0-9]*"  # the same, as a git describe/tag pattern
 # On Windows, keep git from flashing a console window at every call.
 _NO_WINDOW = 0x08000000 if sys.platform.startswith("win") else 0  # CREATE_NO_WINDOW
+
+
+def version_name(tag):
+    """Human version from a release tag: 'win-v1.2.3' -> '1.2.3'."""
+    match = RELEASE.match(tag or "")
+    return ".".join(match.groups()) if match else (tag or "")
 
 TEXTS = {
     "fr": {
@@ -45,7 +53,7 @@ TEXTS = {
         "dev_version": "Version de développement",
         "up_to_date": "À jour (vérifié à {when})",
         "no_release": "Aucune version publiée (vérifié à {when})",
-        "available": "Mise à jour disponible : {count} changement{s}",
+        "available": "Version {latest} disponible : {count} changement{s}",
         "failed": "Vérification impossible : {error}",
         "blocked": "Mise à jour à faire à la main : {error}",
         "check": "Vérifier les mises à jour",
@@ -65,7 +73,7 @@ TEXTS = {
         "dev_version": "Development version",
         "up_to_date": "Up to date (checked at {when})",
         "no_release": "No release yet (checked at {when})",
-        "available": "Update available: {count} change{s}",
+        "available": "Version {latest} available: {count} change{s}",
         "failed": "Check failed: {error}",
         "blocked": "Update by hand: {error}",
         "check": "Check for updates",
@@ -113,19 +121,17 @@ def is_clone():
     return os.path.isdir(os.path.join(BASE_DIR, ".git"))
 
 
-def upstream():
-    """The remote-tracking branch this clone follows (e.g. origin/windows).
-
-    The Windows cats track their branch rather than the release tags of main:
-    an update fast-forwards the clone to this branch."""
-    return git("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+def releases():
+    """Windows release tags known to the clone, newest first (win-vX.Y.Z)."""
+    tags = [t for t in git("tag", "--list", "win-v*").splitlines() if RELEASE.match(t)]
+    return sorted(tags, key=lambda t: tuple(int(n) for n in RELEASE.match(t).groups()), reverse=True)
 
 
 def installed_version():
-    """(release the clone is on or after, commits since it): ("v1.2.3", 0),
-    or (None, 0) before any release."""
+    """(Windows release the clone is on or after, commits since it):
+    ("win-v1.2.3", 0), or (None, 0) before any release."""
     try:
-        described = git("describe", "--tags", "--long", "--match", "v[0-9]*.[0-9]*.[0-9]*")
+        described = git("describe", "--tags", "--long", "--match", TAG_GLOB)
     except UpdateError:
         return None, 0
     tag, since, _hash = described.rsplit("-", 2)
@@ -152,12 +158,14 @@ def check():
             raise UpdateError("no_git")
         git("fetch", "--quiet", "--tags", "--force")
         state["version"], state["since"] = installed_version()
-        target = state["latest"] = upstream()
-        state["behind"] = int(git("rev-list", "--count", f"HEAD..{target}"))
-        if state["behind"]:
-            state["changes"] = git("log", "--no-merges", "--format=%s", f"HEAD..{target}").splitlines()
-        # Local commits not yet on the upstream branch: they block a fast-forward.
-        state["ahead"] = int(git("rev-list", "--count", f"{target}..HEAD"))
+        tags = releases()
+        if tags:
+            latest = state["latest"] = tags[0]
+            state["behind"] = int(git("rev-list", "--count", f"HEAD..{latest}"))
+            if state["behind"]:
+                state["changes"] = git("log", "--no-merges", "--format=%s", f"HEAD..{latest}").splitlines()
+        # Local commits GitHub does not have: they block a fast-forward.
+        state["ahead"] = int(git("rev-list", "--count", "HEAD", "--not", "--remotes"))
         # Untracked files (and config.json, ignored) do not block an update.
         state["dirty"] = bool(git("status", "--porcelain", "--untracked-files=no"))
     except UpdateError as error:
@@ -257,7 +265,9 @@ def describe(state, lang, busy=None):
         return t["never"]
     if state.get("behind"):
         count = len(state.get("changes") or []) or state["behind"]
-        line = t["available"].format(count=count, s="s" if count > 1 else "")
+        line = t["available"].format(
+            latest=version_name(state.get("latest")), count=count, s="s" if count > 1 else ""
+        )
         reason = blocker(state)
         return t["blocked"].format(error=t[reason]) if reason else line
     when = time.strftime("%H:%M", time.localtime(state["checked"]))
@@ -270,8 +280,8 @@ def describe_version(state, lang):
     version = state.get("version")
     if not version:
         return t["dev_version"]
-    # "+": newer than that release (main pulled by hand)
-    return t["version"].format(version=version.lstrip("v") + ("+" if state.get("since") else ""))
+    # "+": past that release (branch pulled by hand beyond the tag)
+    return t["version"].format(version=version_name(version) + ("+" if state.get("since") else ""))
 
 
 # --- Qt part (imported only by the cats) ------------------------------------
