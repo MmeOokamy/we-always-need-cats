@@ -189,24 +189,22 @@ sections ci-dessous.
 
 **Mise à jour**
 
-Les chats vérifient une fois par jour et suivent la branche `windows` (pas les
-versions de `main`). Quand la branche est en avance, la bulle d'un chat survolé
-indique « update available » et le sous-menu **Mises à jour** du clic droit
-propose **Mettre à jour et redémarrer**, qui l'installe et redémarre les chats
-aussitôt. Depuis un terminal :
+Les chats vérifient une fois par jour s'il y a une nouvelle **version Windows**
+(tags `win-vX.Y.Z` sur la branche `windows`, distincts des versions de `main`).
+Quand une version sort, la bulle d'un chat survolé indique « update available »
+et le sous-menu **Mises à jour** du clic droit propose **Mettre à jour et
+redémarrer**, qui l'installe et redémarre les chats aussitôt. Depuis un
+terminal :
 
 ```powershell
-python updates.py           # vérifie, puis met à jour si la branche a bougé
+python updates.py           # vérifie, puis passe à la dernière version Windows
 python updates.py --check   # vérifie seulement
 ```
 
-La mise à jour avance le clone jusqu'à la branche (`git fetch`, puis
-`git merge --ff-only origin/windows`) : elle n'écrase jamais rien et ne touche
-pas à `config.json`. Avec des modifications ou des commits locaux, elle s'arrête
-et indique de mettre à jour à la main. Un simple `git pull` marche aussi ;
-fermez alors les chats (clic droit → **Quitter**) pour qu'ils redémarrent sur le
-nouveau code — les chats de session reviennent au prochain événement de Claude
-Code.
+La mise à jour avance le clone jusqu'à la dernière version (`git fetch`, puis
+`git merge --ff-only win-vX.Y.Z`) : elle n'écrase jamais rien et ne touche pas à
+`config.json`. Avec des modifications ou des commits locaux, elle s'arrête et
+indique de mettre à jour à la main.
 
 **Désinstallation**
 
@@ -244,17 +242,18 @@ python3 install.py --settings /chemin/du/projet/.claude/settings.json
 
 ## Mises à jour
 
-Les chats vérifient une fois par jour si la **branche `windows`** a avancé sur
-GitHub, et suivent cette branche : elle porte le code spécifique à Windows, donc
-les mises à jour la suivent plutôt que les versions de `main`. Quand la branche
-est en avance, la bulle d'un chat survolé l'indique (« update available »), et
-le sous-menu **Updates** du clic droit (ou **Mises à jour** sur le chat d'usage)
-donne :
+Les chats vérifient une fois par jour s'il y a une nouvelle **version Windows**
+sur GitHub : les tags `win-vX.Y.Z` de la branche `windows`, qui porte le code
+spécifique à Windows et reste distincte des versions de `main`. Seules ces
+versions sont proposées, pas chaque changement poussé sur la branche entre deux
+d'entre elles. Quand une version sort, la bulle d'un chat survolé l'indique
+(« update available »), et le sous-menu **Updates** du clic droit (ou **Mises à
+jour** sur le chat d'usage) donne :
 
-- la version installée (« 1.0.0+ » : au-delà de la version 1.0.0, sur la
-  branche windows) ;
-- l'état : jamais vérifié, à jour (avec l'heure de la vérification), mise à jour
-  disponible avec le nombre de changements, ou vérification impossible ;
+- la version installée (« 1.0.0+ » : au-delà de la version Windows 1.0.0,
+  branche tirée à la main au-delà du tag) ;
+- l'état : jamais vérifié, à jour (avec l'heure de la vérification), nouvelle
+  version disponible avec le nombre de changements, ou vérification impossible ;
 - **What changed** / **Nouveautés** : la liste des changements à venir ;
 - **Check for updates** / **Vérifier les mises à jour** : vérifier tout de
   suite ;
@@ -266,28 +265,36 @@ donne :
 Depuis un terminal :
 
 ```bash
-python3 updates.py           # vérifie, puis met à jour si la branche a bougé
+python3 updates.py           # vérifie, puis passe à la dernière version Windows
 python3 updates.py --check   # vérifie seulement
 ```
 
-La mise à jour avance le clone jusqu'à sa branche de suivi (`git fetch`, puis
-`git merge --ff-only origin/windows`) : elle n'écrase jamais rien. Avec des
-modifications locales ou des commits qui ne sont pas sur la branche, elle
-s'arrête et indique de mettre à jour à la main. Il faut avoir installé les chats
-avec `git clone` ; `config.json` n'est pas touché. Une nouvelle version qui
-change les hooks ou la status line le précise dans ses changements : relancer
-alors `python3 install.py`.
+La mise à jour avance le clone jusqu'à la dernière version (`git fetch`, puis
+`git merge --ff-only win-vX.Y.Z`) : elle n'écrase jamais rien. Avec des
+modifications locales ou des commits absents de GitHub, elle s'arrête et indique
+de mettre à jour à la main. Il faut avoir installé les chats avec `git clone` ;
+`config.json` n'est pas touché. Une nouvelle version qui change les hooks ou la
+status line le précise dans ses changements : relancer alors
+`python3 install.py`.
 
-### Publier une mise à jour
+### Publier une version Windows
 
-Les chats suivent la branche `windows` : poussez-y vos changements et chaque
-clone les reçoit à sa vérification quotidienne (ou tout de suite avec
-**Vérifier les mises à jour**).
+Les versions Windows sont des tags `win-vX.Y.Z` sur la branche `windows`
+(version sémantique : le dernier nombre pour une correction, celui du milieu
+pour une nouveauté, le premier pour un changement qui demande d'agir, comme
+relancer `install.py`). Elles restent distinctes des versions `vX.Y.Z` de
+`main` :
 
 ```bash
-git switch windows
-git push origin windows
+git switch windows && git push origin windows   # publier d'abord la branche
+git tag -a win-v1.1.0 -m "win-v1.1.0"
+git push origin win-v1.1.0
 ```
+
+Les chats proposent la version dès le push du tag (à la vérification
+quotidienne, ou tout de suite avec **Vérifier les mises à jour**). En option,
+sur GitHub, **Releases** → **Draft a new release** : choisir le tag
+`win-vX.Y.Z` et décrire les changements.
 
 ## Réglages
 

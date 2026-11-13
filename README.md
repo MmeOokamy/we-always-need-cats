@@ -182,23 +182,21 @@ already there. The cats show up on the next Claude Code event. `--no-usage`,
 
 **Update**
 
-The cats check once a day and follow the `windows` branch (not the `main`
-releases). When the branch is ahead, a hovered cat's bubble says "update
-available" and the **Updates** (**Mises à jour**) right-click submenu offers
-**Update and restart**, which installs it and restarts the cats at once. From a
-terminal:
+The cats check once a day for a new **Windows release** (`win-vX.Y.Z` tags on
+the `windows` branch, kept apart from the `main` releases). When one is out, a
+hovered cat's bubble says "update available" and the **Updates** (**Mises à
+jour**) right-click submenu offers **Update and restart**, which installs it and
+restarts the cats at once. From a terminal:
 
 ```powershell
-python updates.py           # check, then update if the windows branch moved
+python updates.py           # check, then update to the latest Windows release
 python updates.py --check   # check only
 ```
 
-The update fast-forwards the clone to the branch (`git fetch`, then
-`git merge --ff-only origin/windows`): it never overwrites anything and leaves
+The update fast-forwards the clone to the latest release (`git fetch`, then
+`git merge --ff-only win-vX.Y.Z`): it never overwrites anything and leaves
 `config.json` alone. With local changes or local commits it stops and says to
-update by hand. A plain `git pull` works too; then quit the cats (right click →
-**Quit**) so they restart on the new code — the session cats come back at the
-next Claude Code event.
+update by hand.
 
 **Uninstall**
 
@@ -235,16 +233,18 @@ python3 install.py --settings /path/to/project/.claude/settings.json
 
 ## Updates
 
-The cats check once a day whether the **`windows` branch** has moved on GitHub,
-and follow that branch: it carries the Windows-specific code, so updates track
-it rather than the `main` releases. When the branch is ahead, the bubble of a
-hovered cat says so ("update available"), and the **Updates** submenu of the
-right-click menu (**Mises à jour** on the usage cat when it speaks French)
-gives:
+The cats check once a day for a new **Windows release** on GitHub: the
+`win-vX.Y.Z` tags on the `windows` branch, which carries the Windows-specific
+code and is kept apart from the `main` releases. Only these releases are
+offered, not every change pushed to the branch between two of them. When one is
+out, the bubble of a hovered cat says so ("update available"), and the
+**Updates** submenu of the right-click menu (**Mises à jour** on the usage cat
+when it speaks French) gives:
 
-- the installed version ("1.0.0+": past release 1.0.0, on the windows branch);
-- the state: never checked, up to date (with the time of the check), an update
-  available with the number of changes, or check failed;
+- the installed version ("1.0.0+": past Windows release 1.0.0, branch pulled by
+  hand beyond the tag);
+- the state: never checked, up to date (with the time of the check), a new
+  release available with the number of changes, or check failed;
 - **What changed**: the list of the coming changes;
 - **Check for updates**: check right now;
 - **Update and restart**: install the new version. The cats restart on it at
@@ -254,26 +254,33 @@ gives:
 From a terminal:
 
 ```bash
-python3 updates.py           # check, then update if the branch moved
+python3 updates.py           # check, then update to the latest Windows release
 python3 updates.py --check   # check only
 ```
 
-The update moves the clone forward to its upstream branch (`git fetch`, then
-`git merge --ff-only origin/windows`): it never overwrites anything. With local
-changes or local commits that are not on the branch, it stops and says to update
+The update moves the clone forward to the latest release (`git fetch`, then
+`git merge --ff-only win-vX.Y.Z`): it never overwrites anything. With local
+changes or local commits that GitHub does not have, it stops and says to update
 by hand. The cats must have been installed with `git clone`; `config.json` is
-left alone. A new version that changes the hooks or the status line says so in
+left alone. A new release that changes the hooks or the status line says so in
 its changes: then run `python3 install.py` again.
 
-### Publishing an update
+### Publishing a Windows release
 
-The cats follow the `windows` branch: push your changes there and every clone
-picks them up at its next daily check (or at once with **Check for updates**).
+Windows releases are `win-vX.Y.Z` tags on the `windows` branch (semantic
+versioning: the last number for a fix, the middle one for a new feature, the
+first one for a change that asks for action, such as running `install.py`
+again). They sit apart from the `vX.Y.Z` releases of `main`:
 
 ```bash
-git switch windows
-git push origin windows
+git switch windows && git push origin windows   # publish the branch first
+git tag -a win-v1.1.0 -m "win-v1.1.0"
+git push origin win-v1.1.0
 ```
+
+The cats offer the release as soon as the tag is pushed (at the next daily
+check, or at once with **Check for updates**). Optionally, on GitHub, **Releases**
+→ **Draft a new release**: pick the `win-vX.Y.Z` tag and describe the changes.
 
 ## Settings
 
