@@ -249,6 +249,9 @@ Pour le chat d'usage (qui suit aussi `scale`) :
 - `kwin_cursor.js` est un script KWin chargé par `cats.py`. Sous Wayland, une
   application ne peut pas lire la position de la souris : KWin la transmet.
 - `sprites.py` contient les dessins et les couleurs.
+- `popup.py` ouvre les menus du clic droit et les ferme au clic à côté (les
+  chats ne prennent jamais le focus, ce qui empêche un menu ordinaire de voir
+  ce clic sous Wayland).
 - `usage_statusline.py` est appelé par Claude Code à chaque rafraîchissement
   de la status line. Il reçoit les limites du compte (`rate_limits`), les
   enregistre dans `~/.cache/usage-cat/state.json`, lance `usage_cat.py` s'il ne

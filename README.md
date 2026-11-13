@@ -240,6 +240,9 @@ For the usage cat (which also follows `scale`):
 - `kwin_cursor.js` is a KWin script loaded by `cats.py`. Under Wayland an
   application cannot read the mouse position: KWin reports it.
 - `sprites.py` holds the drawings and the colors.
+- `popup.py` opens the right-click menus and closes them on a click outside
+  (the cats never take the focus, which keeps a plain menu from seeing that
+  click under Wayland).
 - `usage_statusline.py` is called by Claude Code at every status line refresh.
   It receives the limits of the account (`rate_limits`), saves them to
   `~/.cache/usage-cat/state.json`, starts `usage_cat.py` if it is not running

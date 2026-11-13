@@ -41,6 +41,7 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import QApplication, QMenu, QWidget
 
+import popup
 import sprites
 import usage_common
 
@@ -571,7 +572,7 @@ class Cat(QWidget):
         usage.toggled.connect(self.app.set_usage_cat)
         menu.addAction("Usage cat only (hide session cats)", self.app.usage_only)
         menu.addAction("Quit we-always-need-cats", QApplication.instance().quit)
-        menu.exec(position)
+        popup.show_menu(menu, position)
 
     def reset_home(self):
         self.home = None

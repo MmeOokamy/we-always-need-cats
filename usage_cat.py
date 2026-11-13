@@ -43,6 +43,7 @@ from PyQt6.QtGui import (
 from PyQt6.QtWidgets import QApplication, QMenu, QWidget
 
 import usage_common as common
+import popup
 import sprites
 from usage_common import LEVEL_COLOR, LEVELS, SETTINGS, TEXT
 
@@ -421,7 +422,7 @@ class UsageCat(QWidget):
         menu.addSeparator()
         menu.addAction(TEXT["menu_hide"], self.hide_for_good)
         menu.addAction(TEXT["menu_quit"], QApplication.instance().quit)
-        menu.exec(position)
+        popup.show_menu(menu, position)
 
 
 def preview(path):
