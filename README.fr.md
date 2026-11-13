@@ -20,7 +20,7 @@ montre ce que fait chaque session Claude Code.
 |---|---|
 | Session ouverte, rien en cours | Assis à sa place, puis endormi après 3 minutes |
 | Claude travaille | Tape sur son ordinateur ; la bulle décrit l'action |
-| Claude réfléchit (entre deux actions) | Fait sauter des crêpes dans une poêle, en alternance avec son ordinateur |
+| Claude réfléchit (entre deux actions) | Passe de son ordinateur aux crêpes, puis à une pelote de laine, à tour de rôle |
 | Sous-agents en cours | Des chatons travaillent à côté de lui, un par sous-agent |
 | Question ou demande d'autorisation, ou réponse de Claude qui se termine par une question | Court vers la souris et la suit, bulle orange |
 | Tâche terminée | Court vers la souris, saute de joie, bulle verte ; retourne à sa place après 30 secondes |
@@ -29,10 +29,11 @@ montre ce que fait chaque session Claude Code.
 La couleur de l'écran de son ordinateur dépend de l'activité : vert quand il
 écrit un fichier, bleu quand il lit ou cherche, jaune pour une commande, violet
 pour le web, rose quand il délègue à un agent, gris clair quand il réfléchit.
-Quand Claude réfléchit, l'ordinateur laisse aussi place de temps en temps à une
-poêle : le chat fait sauter une crêpe, qui se retourne en l'air avant de
-retomber dans la poêle. Il change toutes les deux crêpes pendant une longue
-réflexion, et une réflexion sur deux commence par les crêpes.
+Quand Claude réfléchit, le chat change d'occupation toutes les quelques
+secondes : son ordinateur, puis une poêle, où il fait sauter une crêpe qui se
+retourne en l'air avant de retomber dans la poêle, puis une pelote de laine :
+il lève la patte, frappe la pelote, qui roule jusqu'à sa queue, et la queue la
+renvoie. Chaque réflexion commence par l'occupation suivante.
 
 Une réponse de Claude qui se termine par une question (un point d'interrogation
 dans son dernier paragraphe, hors code, liens et citations) compte comme une
@@ -44,8 +45,8 @@ Les chatons s'installent à droite du chat, par rangées de trois, sur trois
 niveaux légèrement superposés. Au-delà de neuf sous-agents, ils se serrent sur
 leurs rangées : chaque sous-agent garde son chaton. La bulle donne le nombre de
 sous-agents et leurs types. Comme le chat, un chaton dont le sous-agent
-réfléchit alterne entre son ordinateur et sa poêle à crêpes, chacun à son
-rythme.
+réfléchit passe tour à tour de son ordinateur à sa poêle à crêpes et à sa
+pelote, chacun à son rythme.
 
 ## Souris
 

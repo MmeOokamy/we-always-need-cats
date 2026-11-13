@@ -10,6 +10,7 @@ Every sprite is a list of text lines, one character per pixel:
     G  laptop shell, frying pan
     L  laptop screen (color depends on the activity)
     C  crepe              B  browned spots of the crepe
+    Y  yarn               R  darker yarn strands
 
 After editing a drawing, run `python3 sprites.py preview.png` to see the result.
 """
@@ -116,6 +117,24 @@ _BODY_PAN_UP = [  # pan raised: throwing or catching the crepe
 ]
 
 
+# --- Yarn ball (thinking): the left front paw is drawn on its own -----------
+
+_BODY_NO_PAW = [  # the left front paw is raised (_PAW_UP or _PAW_DOWN)
+    "..KFFFFFFFFFFK....",
+    ".KFFFWWWWWWFFFK...",
+    ".KFFFWWWWWWFFFK.KK",
+    ".KFFFFWWWWFKFFKKFK",
+    ".KFFFFFKKFFKFFFFK.",
+    ".KKKKKKKKKKKKKKK..",
+]
+
+# Drawn on their own over the cat by cats.py (see YARN_PLAY).
+_PAW_UP = [".KK.", "KWWK", "KFFK", "KFFK", "KFK."]  # raised beside the head
+_PAW_DOWN = ["KFFK", "KFFK", "KWWK", ".KK."]  # pressing on the ball
+_YARN_A = ["..KKK..", ".KYYRK.", "KYRRYYK", "KRYYRRK", "KYRRYYK", ".KYYRK.", "..KKK.."]
+_YARN_B = ["..KKK..", ".KRYYK.", "KYYRRYK", "KRRYYRK", "KYYRRYK", ".KRYYK.", "..KKK.."]
+
+
 def _wide(lines):
     """Head lines widened to the 20 pixels of the pan bodies."""
     return [line + ".." for line in lines]
@@ -189,6 +208,12 @@ IMAGES = {
     "crepe_flat": _CREPE_FLAT,
     "crepe_flipped": _CREPE_FLIPPED,
     "crepe_tilted": _CREPE_TILTED,
+    "play_paw": _head("open") + _BODY_NO_PAW,
+    "play_pounce": _head("happy", "open") + _BODY_NO_PAW,
+    "paw_up": _PAW_UP,
+    "paw_down": _PAW_DOWN,
+    "yarn_a": _YARN_A,
+    "yarn_b": _YARN_B,
     "run_a": _RUN_A,
     "run_b": _RUN_B,
     "sleep_a": _SLEEP_A,
@@ -212,6 +237,19 @@ ANIMATIONS = {
         "flip_up",
         "flip_full",
     ],
+    # Thinking too: the cat plays with a ball of yarn (see YARN_PLAY).
+    "play": [
+        "sit_a",
+        "play_paw",
+        "play_pounce",
+        "sit_a",
+        "sit_a",
+        "sit_a",
+        "sit_b",
+        "sit_a",
+        "sit_a",
+        "sit_a",
+    ],
     "run": ["run_a", "run_b"],
     "sleep": ["sleep_a"] * 3 + ["sleep_b"] * 3,
 }
@@ -228,6 +266,24 @@ CREPE_FLIGHT = [
     ("crepe_tilted", 6, -4, True),  # falling back
     ("crepe_flat", 4, -1, False),  # about to land in the pan
     None,
+]
+
+# Yarn ball and raised paw, frame by frame of the "play" animation: what is
+# drawn over the cat, in drawing order, as (sprite, column, line, mirrored).
+# The cat raises its paw and hits the ball, which rolls to its tail; the tail
+# flicks it back.
+_GROUND = 9  # line of the ball lying in front of the cat
+YARN_PLAY = [
+    [("yarn_a", 0, _GROUND, False)],
+    [("yarn_a", 0, _GROUND, False), ("paw_up", -2, 7, False)],  # paw raised
+    [("yarn_b", 0, _GROUND, False), ("paw_down", -1, 6, False)],  # hit
+    [("yarn_b", 3, _GROUND, False)],  # rolling away
+    [("yarn_a", 7, _GROUND, False)],
+    [("yarn_b", 11, _GROUND, False)],
+    [("yarn_a", 11, _GROUND - 2, False)],  # bounces on the tail
+    [("yarn_b", 8, _GROUND, False)],  # rolling back
+    [("yarn_a", 4, _GROUND, False)],
+    [("yarn_b", 1, _GROUND, False)],
 ]
 
 # Small symbols drawn above the cat.
@@ -288,6 +344,8 @@ def palette(coat, activity="think"):
         "L": SCREENS.get(activity, SCREENS["think"]),
         "C": "#F6C86E",
         "B": "#C98A3A",
+        "Y": "#F03E3E",
+        "R": "#B02525",
     }
 
 
