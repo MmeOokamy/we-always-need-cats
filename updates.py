@@ -8,11 +8,12 @@ The cats use the same functions: an automatic check once a day, and an
 "Updates" submenu in their right-click menu (state, what changed, check now,
 update and restart).
 
-Only releases are offered: the git tags vX.Y.Z published on GitHub. What is
-merged on main between two releases waits for the next one.
+The Windows cats follow their own branch (the clone's upstream, e.g.
+origin/windows), not the release tags of main: that branch carries the
+Windows-specific code, so an update tracks it rather than the shared releases.
 
-An update never overwrites anything: it is a fast-forward of the clone to the
-latest release. With local changes or local commits, it stops and says so.
+An update never overwrites anything: it is a fast-forward of the clone to its
+upstream branch. With local changes or local commits, it stops and says so.
 After an update, the running cats restart by themselves on the new version
 (see restart_wanted).
 """
@@ -31,6 +32,8 @@ UPDATED = os.path.join(CACHE, "updated")  # touched after an update: restart
 CHECK_EVERY = 24 * 3600  # automatic check, in seconds
 GIT_TIMEOUT = 30
 RELEASE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")  # release tags: v1.2.3
+# On Windows, keep git from flashing a console window at every call.
+_NO_WINDOW = 0x08000000 if sys.platform.startswith("win") else 0  # CREATE_NO_WINDOW
 
 TEXTS = {
     "fr": {
@@ -42,7 +45,7 @@ TEXTS = {
         "dev_version": "Version de développement",
         "up_to_date": "À jour (vérifié à {when})",
         "no_release": "Aucune version publiée (vérifié à {when})",
-        "available": "Version {latest} disponible : {count} changement{s}",
+        "available": "Mise à jour disponible : {count} changement{s}",
         "failed": "Vérification impossible : {error}",
         "blocked": "Mise à jour à faire à la main : {error}",
         "check": "Vérifier les mises à jour",
@@ -62,7 +65,7 @@ TEXTS = {
         "dev_version": "Development version",
         "up_to_date": "Up to date (checked at {when})",
         "no_release": "No release yet (checked at {when})",
-        "available": "Version {latest} available: {count} change{s}",
+        "available": "Update available: {count} change{s}",
         "failed": "Check failed: {error}",
         "blocked": "Update by hand: {error}",
         "check": "Check for updates",
@@ -96,6 +99,7 @@ def git(*args, timeout=GIT_TIMEOUT):
             text=True,
             timeout=timeout,
             env=dict(os.environ, GIT_TERMINAL_PROMPT="0", LC_ALL="C"),
+            creationflags=_NO_WINDOW,
         )
     except (OSError, subprocess.TimeoutExpired) as error:
         raise UpdateError(str(error)) from error
@@ -109,10 +113,12 @@ def is_clone():
     return os.path.isdir(os.path.join(BASE_DIR, ".git"))
 
 
-def releases():
-    """Release tags known to the clone, from the newest."""
-    tags = [t for t in git("tag", "--list", "v*").splitlines() if RELEASE.match(t)]
-    return sorted(tags, key=lambda t: tuple(int(n) for n in RELEASE.match(t).groups()), reverse=True)
+def upstream():
+    """The remote-tracking branch this clone follows (e.g. origin/windows).
+
+    The Windows cats track their branch rather than the release tags of main:
+    an update fast-forwards the clone to this branch."""
+    return git("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
 
 
 def installed_version():
@@ -146,14 +152,12 @@ def check():
             raise UpdateError("no_git")
         git("fetch", "--quiet", "--tags", "--force")
         state["version"], state["since"] = installed_version()
-        tags = releases()
-        if tags:
-            latest = state["latest"] = tags[0]
-            state["behind"] = int(git("rev-list", "--count", f"HEAD..{latest}"))
-            if state["behind"]:
-                state["changes"] = git("log", "--no-merges", "--format=%s", f"HEAD..{latest}").splitlines()
-        # Local commits: commits that GitHub does not have.
-        state["ahead"] = int(git("rev-list", "--count", "HEAD", "--not", "--remotes"))
+        target = state["latest"] = upstream()
+        state["behind"] = int(git("rev-list", "--count", f"HEAD..{target}"))
+        if state["behind"]:
+            state["changes"] = git("log", "--no-merges", "--format=%s", f"HEAD..{target}").splitlines()
+        # Local commits not yet on the upstream branch: they block a fast-forward.
+        state["ahead"] = int(git("rev-list", "--count", f"{target}..HEAD"))
         # Untracked files (and config.json, ignored) do not block an update.
         state["dirty"] = bool(git("status", "--porcelain", "--untracked-files=no"))
     except UpdateError as error:
@@ -184,7 +188,8 @@ def update():
     if reason:
         raise UpdateError(reason)
     git("merge", "--ff-only", "--quiet", state["latest"])
-    save_state(dict(state, version=state["latest"], since=0, behind=0, changes=[]))
+    version, since = installed_version()
+    save_state(dict(state, version=version, since=since, behind=0, changes=[]))
     ask_restart()
     return state["changes"]
 
@@ -252,7 +257,7 @@ def describe(state, lang, busy=None):
         return t["never"]
     if state.get("behind"):
         count = len(state.get("changes") or []) or state["behind"]
-        line = t["available"].format(latest=(state.get("latest") or "").lstrip("v"), count=count, s="s" if count > 1 else "")
+        line = t["available"].format(count=count, s="s" if count > 1 else "")
         reason = blocker(state)
         return t["blocked"].format(error=t[reason]) if reason else line
     when = time.strftime("%H:%M", time.localtime(state["checked"]))
