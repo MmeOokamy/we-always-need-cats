@@ -157,12 +157,58 @@ Claude Code is doing.
 
 ### Windows
 
-The cats run on Windows too; use `pip install PyQt6` and run the commands below
-with `python` instead of `python3` (on Windows `python3` opens the Microsoft
-Store, which is the usual cause of a "Python introuvable" hook error). The
-install script registers the hooks with the current interpreter (`pythonw.exe`,
-so no console window flashes). Mouse-following works out of the box, with no
-KWin or D-Bus; the events travel over a local UDP socket on `127.0.0.1`.
+The cats run on Windows 10/11. Two differences from Linux: run the commands with
+`python` instead of `python3` (on Windows `python3` opens the Microsoft Store,
+the usual cause of a "Python introuvable" hook error), and follow the dedicated
+**`windows`** branch, which carries the Windows code. Mouse-following works out
+of the box, with no KWin or D-Bus: the events travel over a local UDP socket on
+`127.0.0.1`, and the hooks and status line run with `pythonw.exe`, so no console
+window flashes.
+
+**Install**
+
+```powershell
+git clone -b windows https://github.com/MmeOokamy/we-always-need-cats.git
+cd we-always-need-cats
+pip install PyQt6
+python install.py
+```
+
+`install.py` registers the hooks and the usage-cat status line in
+`~/.claude/settings.json` (backed up to
+`~/.claude/settings.json.backup-we-always-need-cats` first), keeping whatever is
+already there. The cats show up on the next Claude Code event. `--no-usage`,
+`--usage-only`, `--force` and `--settings` work as in the sections below.
+
+**Update**
+
+The cats check once a day and follow the `windows` branch (not the `main`
+releases). When the branch is ahead, a hovered cat's bubble says "update
+available" and the **Updates** (**Mises à jour**) right-click submenu offers
+**Update and restart**, which installs it and restarts the cats at once. From a
+terminal:
+
+```powershell
+python updates.py           # check, then update if the windows branch moved
+python updates.py --check   # check only
+```
+
+The update fast-forwards the clone to the branch (`git fetch`, then
+`git merge --ff-only origin/windows`): it never overwrites anything and leaves
+`config.json` alone. With local changes or local commits it stops and says to
+update by hand. A plain `git pull` works too; then quit the cats (right click →
+**Quit**) so they restart on the new code — the session cats come back at the
+next Claude Code event.
+
+**Uninstall**
+
+```powershell
+python install.py --uninstall
+```
+
+This removes this project's hooks and status line from
+`~/.claude/settings.json`. If you move the folder, run `python install.py` again
+from the new location: the hooks store the full path of the scripts.
 
 ## Install
 
@@ -189,17 +235,16 @@ python3 install.py --settings /path/to/project/.claude/settings.json
 
 ## Updates
 
-The cats check once a day whether a new version is out on GitHub
-([releases](https://github.com/MmeOokamy/we-always-need-cats/releases)). Only
-releases are offered, not every change merged between two releases. When a new
-release is out, the bubble of a hovered cat says so ("update available"), and the
-**Updates** submenu of the right-click menu (**Mises à jour** on the usage cat
-when it speaks French) gives:
+The cats check once a day whether the **`windows` branch** has moved on GitHub,
+and follow that branch: it carries the Windows-specific code, so updates track
+it rather than the `main` releases. When the branch is ahead, the bubble of a
+hovered cat says so ("update available"), and the **Updates** submenu of the
+right-click menu (**Mises à jour** on the usage cat when it speaks French)
+gives:
 
-- the installed version ("1.0.0+": newer than release 1.0.0, updated by hand
-  with `git pull`);
-- the state: never checked, up to date (with the time of the check), new
-  version available with the number of changes, or check failed;
+- the installed version ("1.0.0+": past release 1.0.0, on the windows branch);
+- the state: never checked, up to date (with the time of the check), an update
+  available with the number of changes, or check failed;
 - **What changed**: the list of the coming changes;
 - **Check for updates**: check right now;
 - **Update and restart**: install the new version. The cats restart on it at
@@ -209,32 +254,26 @@ when it speaks French) gives:
 From a terminal:
 
 ```bash
-python3 updates.py           # check, then update if there is something new
+python3 updates.py           # check, then update if the branch moved
 python3 updates.py --check   # check only
 ```
 
-The update moves the clone forward to the latest release (`git fetch --tags`,
-then `git merge --ff-only vX.Y.Z`): it never overwrites anything. With local
-changes or commits that GitHub does not have, it stops and says to update by
-hand. The cats must have been
-installed with `git clone`; `config.json` is left alone. A new version that
-changes the hooks or the status line says so in its changes: then run
-`python3 install.py` again.
+The update moves the clone forward to its upstream branch (`git fetch`, then
+`git merge --ff-only origin/windows`): it never overwrites anything. With local
+changes or local commits that are not on the branch, it stops and says to update
+by hand. The cats must have been installed with `git clone`; `config.json` is
+left alone. A new version that changes the hooks or the status line says so in
+its changes: then run `python3 install.py` again.
 
-### Publishing a release
+### Publishing an update
 
-Releases are `vX.Y.Z` tags on `main` (semantic versioning: the last number for
-a fix, the middle one for a new feature, the first one for a change that asks
-for action, such as running `install.py` again):
+The cats follow the `windows` branch: push your changes there and every clone
+picks them up at its next daily check (or at once with **Check for updates**).
 
 ```bash
-git switch main && git pull
-git tag -a v1.1.0 -m "v1.1.0"
-git push origin v1.1.0
+git switch windows
+git push origin windows
 ```
-
-Then, on GitHub, **Releases**, **Draft a new release**: pick the tag and
-describe the changes. The cats offer the release as soon as the tag is pushed.
 
 ## Settings
 
