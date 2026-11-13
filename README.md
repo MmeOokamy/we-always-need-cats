@@ -22,7 +22,7 @@ Claude Code session is doing.
 | Claude is working | Types on its laptop; the bubble describes the action |
 | Claude is thinking (between two actions) | Flips crepes in a frying pan, alternating with its laptop |
 | Subagents running | Kittens work next to it, one per subagent |
-| A question or a permission prompt | Runs to the mouse and follows it, orange bubble |
+| A question or a permission prompt, or an answer from Claude ending with a question | Runs to the mouse and follows it, orange bubble |
 | Task finished | Runs to the mouse, jumps for joy, green bubble; goes home after 30 seconds |
 | Session closed | The cat disappears |
 
@@ -33,6 +33,11 @@ the cat also swaps its laptop for a frying pan now and then: it tosses a crepe,
 which turns over in the air before landing back in the pan. It changes every
 two crepes during a long thinking period, and one thinking period out of two
 starts with the crepes.
+
+An answer from Claude that ends with a question (a question mark in its last
+paragraph, outside code, links and quotes) counts as a question rather than a
+finished task: Claude waits for an answer. It is a guess: a request without a
+question mark ("Tell me when…") stays a finished task.
 
 The kittens sit on the right of the cat, in rows of three, up to three rows
 stacked a little over each other. Past nine subagents, they squeeze together on
@@ -227,6 +232,9 @@ For the usage cat (which also follows `scale`):
 - `hook.py` is called by Claude Code on every event (hooks declared in
   `~/.claude/settings.json`). It sends the essentials of the event to the
   program over a local socket, and starts the program if it is not running.
+  At the end of an answer (`Stop`), it checks whether Claude's last message
+  ends with a question (`last_assistant_message`, or the end of the transcript
+  for Claude Code versions that do not send it).
 - `cats.py` is the program showing the cats (Python and PyQt6). It quits by
   itself fifteen seconds after the last cat is gone.
 - `kwin_cursor.js` is a KWin script loaded by `cats.py`. Under Wayland an
