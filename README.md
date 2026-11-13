@@ -177,13 +177,17 @@ python3 install.py --settings /path/to/project/.claude/settings.json
 
 ## Updates
 
-The cats check once a day whether a new version is out on GitHub. When there is
-one, the bubble of a hovered cat says so ("update available"), and the
+The cats check once a day whether a new version is out on GitHub
+([releases](https://github.com/MmeOokamy/we-always-need-cats/releases)). Only
+releases are offered, not every change merged between two releases. When a new
+release is out, the bubble of a hovered cat says so ("update available"), and the
 **Updates** submenu of the right-click menu (**Mises à jour** on the usage cat
 when it speaks French) gives:
 
-- the state: never checked, up to date (with the time of the check), update
-  available with the number of changes, or check failed;
+- the installed version ("1.0.0+": newer than release 1.0.0, updated by hand
+  with `git pull`);
+- the state: never checked, up to date (with the time of the check), new
+  version available with the number of changes, or check failed;
 - **What changed**: the list of the coming changes;
 - **Check for updates**: check right now;
 - **Update and restart**: install the new version. The cats restart on it at
@@ -197,12 +201,28 @@ python3 updates.py           # check, then update if there is something new
 python3 updates.py --check   # check only
 ```
 
-The update follows the clone's branch (`git fetch`, then `git merge
---ff-only`): it never overwrites anything. With local changes or local
-commits, it stops and says to update by hand. The cats must have been
+The update moves the clone forward to the latest release (`git fetch --tags`,
+then `git merge --ff-only vX.Y.Z`): it never overwrites anything. With local
+changes or commits that GitHub does not have, it stops and says to update by
+hand. The cats must have been
 installed with `git clone`; `config.json` is left alone. A new version that
 changes the hooks or the status line says so in its changes: then run
 `python3 install.py` again.
+
+### Publishing a release
+
+Releases are `vX.Y.Z` tags on `main` (semantic versioning: the last number for
+a fix, the middle one for a new feature, the first one for a change that asks
+for action, such as running `install.py` again):
+
+```bash
+git switch main && git pull
+git tag -a v1.1.0 -m "v1.1.0"
+git push origin v1.1.0
+```
+
+Then, on GitHub, **Releases**, **Draft a new release**: pick the tag and
+describe the changes. The cats offer the release as soon as the tag is pushed.
 
 ## Settings
 

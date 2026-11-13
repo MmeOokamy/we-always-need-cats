@@ -8,13 +8,18 @@ The cats use the same functions: an automatic check once a day, and an
 "Updates" submenu in their right-click menu (state, what changed, check now,
 update and restart).
 
-An update never overwrites anything: it is a fast-forward of the clone. With
-local changes or local commits, it stops and says so. After an update, the
-running cats restart by themselves on the new version (see restart_wanted).
+Only releases are offered: the git tags vX.Y.Z published on GitHub. What is
+merged on main between two releases waits for the next one.
+
+An update never overwrites anything: it is a fast-forward of the clone to the
+latest release. With local changes or local commits, it stops and says so.
+After an update, the running cats restart by themselves on the new version
+(see restart_wanted).
 """
 
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -25,6 +30,7 @@ STATE = os.path.join(CACHE, "updates.json")  # result of the last check
 UPDATED = os.path.join(CACHE, "updated")  # touched after an update: restart
 CHECK_EVERY = 24 * 3600  # automatic check, in seconds
 GIT_TIMEOUT = 30
+RELEASE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")  # release tags: v1.2.3
 
 TEXTS = {
     "fr": {
@@ -32,8 +38,11 @@ TEXTS = {
         "never": "Jamais vérifié",
         "checking": "Vérification…",
         "updating": "Mise à jour…",
+        "version": "Version {version}",
+        "dev_version": "Version de développement",
         "up_to_date": "À jour (vérifié à {when})",
-        "available": "Mise à jour disponible : {count} changement{s}",
+        "no_release": "Aucune version publiée (vérifié à {when})",
+        "available": "Version {latest} disponible : {count} changement{s}",
         "failed": "Vérification impossible : {error}",
         "blocked": "Mise à jour à faire à la main : {error}",
         "check": "Vérifier les mises à jour",
@@ -43,15 +52,17 @@ TEXTS = {
         "no_git": "installé sans git",
         "dirty": "modifications locales",
         "ahead": "commits locaux",
-        "no_upstream": "pas de branche suivie",
     },
     "en": {
         "menu": "Updates",
         "never": "Never checked",
         "checking": "Checking…",
         "updating": "Updating…",
+        "version": "Version {version}",
+        "dev_version": "Development version",
         "up_to_date": "Up to date (checked at {when})",
-        "available": "Update available: {count} change{s}",
+        "no_release": "No release yet (checked at {when})",
+        "available": "Version {latest} available: {count} change{s}",
         "failed": "Check failed: {error}",
         "blocked": "Update by hand: {error}",
         "check": "Check for updates",
@@ -61,7 +72,6 @@ TEXTS = {
         "no_git": "installed without git",
         "dirty": "local changes",
         "ahead": "local commits",
-        "no_upstream": "no tracked branch",
     },
 }
 
@@ -75,7 +85,7 @@ def texts(lang):
 
 class UpdateError(Exception):
     """A check or an update that could not be done; the message is a text key
-    of TEXTS (no_git, dirty, ahead, no_upstream) or git's own message."""
+    of TEXTS (no_git, dirty, ahead) or git's own message."""
 
 
 def git(*args, timeout=GIT_TIMEOUT):
@@ -99,24 +109,53 @@ def is_clone():
     return os.path.isdir(os.path.join(BASE_DIR, ".git"))
 
 
+def releases():
+    """Release tags known to the clone, from the newest."""
+    tags = [t for t in git("tag", "--list", "v*").splitlines() if RELEASE.match(t)]
+    return sorted(tags, key=lambda t: tuple(int(n) for n in RELEASE.match(t).groups()), reverse=True)
+
+
+def installed_version():
+    """(release the clone is on or after, commits since it): ("v1.2.3", 0),
+    or (None, 0) before any release."""
+    try:
+        described = git("describe", "--tags", "--long", "--match", "v[0-9]*.[0-9]*.[0-9]*")
+    except UpdateError:
+        return None, 0
+    tag, since, _hash = described.rsplit("-", 2)
+    return tag, int(since)
+
+
 def check():
-    """Fetch the tracked branch and compare. Saves and returns the state:
-    {"checked", "behind", "ahead", "dirty", "changes", "error"}."""
-    state = {"checked": time.time(), "behind": 0, "ahead": 0, "dirty": False, "changes": [], "error": None}
+    """Fetch the releases and compare. Saves and returns the state:
+    {"checked", "version", "latest", "behind", "ahead", "dirty", "changes",
+    "error"}; behind counts the commits up to the latest release."""
+    state = {
+        "checked": time.time(),
+        "version": None,
+        "since": 0,
+        "latest": None,
+        "behind": 0,
+        "ahead": 0,
+        "dirty": False,
+        "changes": [],
+        "error": None,
+    }
     try:
         if not is_clone():
             raise UpdateError("no_git")
-        try:
-            git("rev-parse", "--abbrev-ref", "@{upstream}")
-        except UpdateError:
-            raise UpdateError("no_upstream") from None
-        git("fetch", "--quiet")
-        state["behind"] = int(git("rev-list", "--count", "HEAD..@{upstream}"))
-        state["ahead"] = int(git("rev-list", "--count", "@{upstream}..HEAD"))
+        git("fetch", "--quiet", "--tags", "--force")
+        state["version"], state["since"] = installed_version()
+        tags = releases()
+        if tags:
+            latest = state["latest"] = tags[0]
+            state["behind"] = int(git("rev-list", "--count", f"HEAD..{latest}"))
+            if state["behind"]:
+                state["changes"] = git("log", "--no-merges", "--format=%s", f"HEAD..{latest}").splitlines()
+        # Local commits: commits that GitHub does not have.
+        state["ahead"] = int(git("rev-list", "--count", "HEAD", "--not", "--remotes"))
         # Untracked files (and config.json, ignored) do not block an update.
         state["dirty"] = bool(git("status", "--porcelain", "--untracked-files=no"))
-        if state["behind"]:
-            state["changes"] = git("log", "--format=%s", "HEAD..@{upstream}").splitlines()
     except UpdateError as error:
         state["error"] = str(error)
         state["checked"] = None  # a failed check is not a check: retried
@@ -134,7 +173,7 @@ def blocker(state):
 
 
 def update():
-    """Fast-forward to the tracked branch, then ask the cats to restart.
+    """Fast-forward to the latest release, then ask the cats to restart.
     Returns the list of changes applied."""
     state = check()
     if state["error"]:
@@ -144,8 +183,8 @@ def update():
     reason = blocker(state)
     if reason:
         raise UpdateError(reason)
-    git("merge", "--ff-only", "--quiet", "@{upstream}")
-    save_state(dict(state, behind=0, changes=[]))
+    git("merge", "--ff-only", "--quiet", state["latest"])
+    save_state(dict(state, version=state["latest"], since=0, behind=0, changes=[]))
     ask_restart()
     return state["changes"]
 
@@ -212,11 +251,22 @@ def describe(state, lang, busy=None):
     if not state.get("checked"):
         return t["never"]
     if state.get("behind"):
-        count = state["behind"]
-        line = t["available"].format(count=count, s="s" if count > 1 else "")
+        count = len(state.get("changes") or []) or state["behind"]
+        line = t["available"].format(latest=(state.get("latest") or "").lstrip("v"), count=count, s="s" if count > 1 else "")
         reason = blocker(state)
         return t["blocked"].format(error=t[reason]) if reason else line
-    return t["up_to_date"].format(when=time.strftime("%H:%M", time.localtime(state["checked"])))
+    when = time.strftime("%H:%M", time.localtime(state["checked"]))
+    return t["up_to_date" if state.get("latest") else "no_release"].format(when=when)
+
+
+def describe_version(state, lang):
+    """The installed version, for a menu."""
+    t = texts(lang)
+    version = state.get("version")
+    if not version:
+        return t["dev_version"]
+    # "+": newer than that release (main pulled by hand)
+    return t["version"].format(version=version.lstrip("v") + ("+" if state.get("since") else ""))
 
 
 # --- Qt part (imported only by the cats) ------------------------------------
@@ -277,8 +327,9 @@ class Updater:
         """The Updates submenu: state, what changed, check, update."""
         t = texts(self.lang)
         sub = menu.addMenu(t["menu"])
-        line = sub.addAction(describe(self.state, self.lang, self.busy))
-        line.setEnabled(False)
+        for text in (describe_version(self.state, self.lang), describe(self.state, self.lang, self.busy)):
+            line = sub.addAction(text)
+            line.setEnabled(False)
         changes = self.state.get("changes") or []
         if changes and not self.busy:
             news = sub.addMenu(t["changes"])
@@ -306,6 +357,7 @@ def main():
         pass
     t = texts(lang)
     state = check()
+    print(describe_version(state, lang))
     print(describe(state, lang))
     for change in state["changes"]:
         print(f"  - {change}")
@@ -316,7 +368,7 @@ def main():
     except UpdateError as error:
         print(t["failed"].format(error=t.get(str(error), str(error))))
         return 1
-    print(texts(lang)["up_to_date"].format(when=time.strftime("%H:%M")))
+    print(describe(read_state(), lang))
     return 0
 
 
