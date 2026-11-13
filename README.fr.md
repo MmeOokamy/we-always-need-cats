@@ -55,8 +55,8 @@ rythme.
 - Clic droit : remettre le chat à sa place, renvoyer ce chat, choisir quand les
   chats suivent la souris, afficher ou masquer le chat d'usage (case **Usage
   cat**, voir [Masquer le chat d'usage](#masquer-le-chat-dusage)), ne garder
-  que le chat d'usage (voir [Chat d'usage seul](#chat-dusage-seul)), ou fermer
-  le programme.
+  que le chat d'usage (voir [Chat d'usage seul](#chat-dusage-seul)), gérer les
+  mises à jour (voir [Mises à jour](#mises-à-jour)), ou fermer le programme.
 
 Le sous-menu **Follow the mouse** contient deux cases à cocher, communes à tous
 les chats de session et enregistrées dans `config.json` :
@@ -182,6 +182,37 @@ Pour ne les installer que sur un projet :
 python3 install.py --settings /chemin/du/projet/.claude/settings.json
 ```
 
+## Mises à jour
+
+Les chats vérifient une fois par jour si une nouvelle version est publiée sur
+GitHub. Quand c'est le cas, la bulle d'un chat survolé l'indique (« update
+available »), et le sous-menu **Updates** du clic droit (ou **Mises à jour**
+sur le chat d'usage) donne :
+
+- l'état : jamais vérifié, à jour (avec l'heure de la vérification), mise à
+  jour disponible avec le nombre de changements, ou vérification impossible ;
+- **What changed** / **Nouveautés** : la liste des changements à venir ;
+- **Check for updates** / **Vérifier les mises à jour** : vérifier tout de
+  suite ;
+- **Update and restart** / **Mettre à jour et redémarrer** : installer la
+  nouvelle version. Les chats redémarrent aussitôt dessus, chat d'usage
+  compris ; les chats de session réapparaissent au prochain événement de
+  Claude Code.
+
+Depuis un terminal :
+
+```bash
+python3 updates.py           # vérifie, puis met à jour s'il y a du nouveau
+python3 updates.py --check   # vérifie seulement
+```
+
+La mise à jour suit la branche du clone (`git fetch`, puis `git merge
+--ff-only`) : elle n'écrase jamais rien. Avec des modifications locales ou des
+commits locaux, elle s'arrête et indique de mettre à jour à la main. Il faut
+avoir installé les chats avec `git clone` ; `config.json` n'est pas touché.
+Une nouvelle version qui change les hooks ou la status line le précise dans ses
+changements : relancer alors `python3 install.py`.
+
 ## Réglages
 
 Créer un fichier `config.json` à côté de `cats.py`, avec uniquement les valeurs
@@ -256,6 +287,10 @@ Pour le chat d'usage (qui suit aussi `scale`) :
 - `usage_cat.py` affiche le chat d'usage et relit ce fichier chaque seconde ;
   `usage_common.py` regroupe ses réglages, ses seuils et ses textes.
 - `install.py` déclare et retire les hooks et la status line.
+- `updates.py` vérifie et installe les mises à jour. Le résultat de la dernière
+  vérification est dans `~/.cache/we-always-need-cats/updates.json` ; après
+  une mise à jour, le fichier `updated` du même dossier demande aux chats de
+  redémarrer.
 
 ## Modifier les dessins
 

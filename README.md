@@ -53,7 +53,8 @@ alternates between its laptop and its crepe pan, each at its own pace.
 - Right click: send the cat home, dismiss that cat, choose when the cats follow
   the mouse, show or hide the usage cat (**Usage cat** checkbox, see
   [Hiding the usage cat](#hiding-the-usage-cat)), keep the usage cat only (see
-  [Usage cat only](#usage-cat-only)), or quit the program.
+  [Usage cat only](#usage-cat-only)), manage updates (see
+  [Updates](#updates)), or quit the program.
 
 The **Follow the mouse** submenu has two checkboxes, shared by every session
 cat and saved in `config.json`:
@@ -174,6 +175,35 @@ To install them for a single project instead:
 python3 install.py --settings /path/to/project/.claude/settings.json
 ```
 
+## Updates
+
+The cats check once a day whether a new version is out on GitHub. When there is
+one, the bubble of a hovered cat says so ("update available"), and the
+**Updates** submenu of the right-click menu (**Mises à jour** on the usage cat
+when it speaks French) gives:
+
+- the state: never checked, up to date (with the time of the check), update
+  available with the number of changes, or check failed;
+- **What changed**: the list of the coming changes;
+- **Check for updates**: check right now;
+- **Update and restart**: install the new version. The cats restart on it at
+  once, usage cat included; the session cats come back at the next Claude Code
+  event.
+
+From a terminal:
+
+```bash
+python3 updates.py           # check, then update if there is something new
+python3 updates.py --check   # check only
+```
+
+The update follows the clone's branch (`git fetch`, then `git merge
+--ff-only`): it never overwrites anything. With local changes or local
+commits, it stops and says to update by hand. The cats must have been
+installed with `git clone`; `config.json` is left alone. A new version that
+changes the hooks or the status line says so in its changes: then run
+`python3 install.py` again.
+
 ## Settings
 
 Create a `config.json` file next to `cats.py` holding only the values you want
@@ -247,6 +277,9 @@ For the usage cat (which also follows `scale`):
 - `usage_cat.py` shows the usage cat and reads that file again every second;
   `usage_common.py` holds its settings, thresholds and texts.
 - `install.py` registers and removes the hooks and the status line.
+- `updates.py` checks for and installs updates. The result of the last check
+  is in `~/.cache/we-always-need-cats/updates.json`; after an update, the
+  `updated` file next to it asks the cats to restart.
 
 ## Editing the drawings
 

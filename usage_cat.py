@@ -44,6 +44,7 @@ from PyQt6.QtWidgets import QApplication, QMenu, QWidget
 
 import usage_common as common
 import sprites
+import updates
 from usage_common import LEVEL_COLOR, LEVELS, SETTINGS, TEXT
 
 S = max(1, int(SETTINGS["scale"]))  # cat scale
@@ -102,6 +103,7 @@ class UsageCat(QWidget):
         self.dragged = False
         self.home = self.saved_home()
         self.signature = None
+        self.updater = None  # updates.Updater, set by main() (not in previews)
 
         self.setWindowTitle(common.APP_NAME)
         self.setWindowFlags(
@@ -237,7 +239,10 @@ class UsageCat(QWidget):
         if not (self.hovered or self.pinned or now < self.notify_until):
             return []
         title = TEXT["renewed_title"] if now < self.celebrate_until else TEXT["title"]
-        return [title] + common.window_lines(self.state, now)
+        lines = [title] + common.window_lines(self.state, now)
+        if self.hovered and self.updater and self.updater.available():
+            lines.append(updates.texts(SETTINGS["lang"])["bubble"])
+        return lines
 
     def bubble_rect(self, lines):
         title_metrics = QFontMetrics(self.font_title)
@@ -419,6 +424,9 @@ class UsageCat(QWidget):
         session_cats.setChecked(bool(SETTINGS["session_cats"]))
         session_cats.toggled.connect(self.set_session_cats)
         menu.addSeparator()
+        if self.updater:
+            self.updater.add_menu(menu)
+            menu.addSeparator()
         menu.addAction(TEXT["menu_hide"], self.hide_for_good)
         menu.addAction(TEXT["menu_quit"], QApplication.instance().quit)
         menu.exec(position)
@@ -483,7 +491,9 @@ def main():
         return 0  # the program is already running
 
     cat = UsageCat()
+    cat.updater = updates.Updater(SETTINGS["lang"])
     cat.show()
+    restarting = []
 
     tick = QTimer()
     tick.timeout.connect(cat.refresh)
@@ -494,6 +504,9 @@ def main():
         # Hidden from a session cat's menu: leave at once.
         if cat.should_quit(time.time()) or common.file_setting("usage_cat") is False:
             application.quit()
+        elif cat.updater.tick():
+            restarting.append(True)  # a new version is installed: restart on it
+            application.quit()
 
     watcher = QTimer()
     watcher.timeout.connect(watch)
@@ -501,7 +514,11 @@ def main():
 
     for stop_signal in (signal.SIGINT, signal.SIGTERM):
         signal.signal(stop_signal, lambda *_: application.quit())
-    return application.exec()
+    code = application.exec()
+    if restarting:
+        lock.close()
+        updates.restart()
+    return code
 
 
 if __name__ == "__main__":
