@@ -1,0 +1,21 @@
+name: Bloquer windows vers main
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  bloquer:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Vérifier la branche source
+        # Nom de branche passé par variable d'environnement, pas dans le
+        # script : un nom de branche choisi par un tiers ne peut pas y
+        # injecter de commande.
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if [ "$HEAD_REF" = "windows" ]; then
+            echo "Fusion de 'windows' dans 'main' interdite."
+            exit 1
+          fi
