@@ -22,7 +22,7 @@ montre ce que fait chaque session Claude Code.
 | Claude travaille | Tape sur son ordinateur ; la bulle décrit l'action |
 | Claude réfléchit (entre deux actions) | Fait sauter des crêpes dans une poêle, en alternance avec son ordinateur |
 | Sous-agents en cours | Des chatons travaillent à côté de lui, un par sous-agent |
-| Question ou demande d'autorisation | Court vers la souris et la suit, bulle orange |
+| Question ou demande d'autorisation, ou réponse de Claude qui se termine par une question | Court vers la souris et la suit, bulle orange |
 | Tâche terminée | Court vers la souris, saute de joie, bulle verte ; retourne à sa place après 30 secondes |
 | Session fermée | Le chat disparaît |
 
@@ -33,6 +33,12 @@ Quand Claude réfléchit, l'ordinateur laisse aussi place de temps en temps à u
 poêle : le chat fait sauter une crêpe, qui se retourne en l'air avant de
 retomber dans la poêle. Il change toutes les deux crêpes pendant une longue
 réflexion, et une réflexion sur deux commence par les crêpes.
+
+Une réponse de Claude qui se termine par une question (un point d'interrogation
+dans son dernier paragraphe, hors code, liens et citations) compte comme une
+question et non comme une tâche terminée : Claude attend une réponse. C'est une
+estimation : une demande sans point d'interrogation (« Dis-moi quand… ») reste
+une tâche terminée.
 
 Les chatons s'installent à droite du chat, par rangées de trois, sur trois
 niveaux légèrement superposés. Au-delà de neuf sous-agents, ils se serrent sur
@@ -234,7 +240,10 @@ Pour le chat d'usage (qui suit aussi `scale`) :
 
 - `hook.py` est appelé par Claude Code à chaque événement (hooks déclarés dans
   `~/.claude/settings.json`). Il envoie l'essentiel de l'événement au programme
-  par une socket locale, et lance le programme s'il ne tourne pas.
+  par une socket locale, et lance le programme s'il ne tourne pas. À la fin
+  d'une réponse (`Stop`), il regarde si le dernier message de Claude se termine
+  par une question (`last_assistant_message`, ou la fin de la transcription
+  pour les versions de Claude Code qui ne l'envoient pas).
 - `cats.py` est le programme qui affiche les chats (Python et PyQt6). Il
   s'arrête de lui-même quinze secondes après le départ du dernier chat.
 - `kwin_cursor.js` est un script KWin chargé par `cats.py`. Sous Wayland, une

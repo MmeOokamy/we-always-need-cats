@@ -818,7 +818,11 @@ class App(QObject):
                 if cat.state == "work":
                     cat.set_state("question", "waiting for your answer")
         elif event == "Stop":
-            cat.set_state("done", "all done")
+            if m.get("asks"):
+                # Claude's turn ends on a question: it waits for an answer.
+                cat.set_state("question", "waiting for your answer")
+            else:
+                cat.set_state("done", "all done")
         elif event == "StopFailure":
             cat.set_state("question", "stopped on an error")
         cat.refresh()
