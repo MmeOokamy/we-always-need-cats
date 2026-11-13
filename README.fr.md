@@ -20,7 +20,7 @@ montre ce que fait chaque session Claude Code.
 |---|---|
 | Session ouverte, rien en cours | Assis à sa place, puis endormi après 3 minutes |
 | Claude travaille | Tape sur son ordinateur ; la bulle décrit l'action |
-| Claude réfléchit (entre deux actions) | Passe de son ordinateur aux crêpes, puis à une pelote de laine, à tour de rôle |
+| Claude réfléchit (entre deux actions) | Passe de son ordinateur aux crêpes, à une pelote de laine et à un Rubik's cube, à tour de rôle |
 | Sous-agents en cours | Des chatons travaillent à côté de lui, un par sous-agent |
 | Question ou demande d'autorisation, ou réponse de Claude qui se termine par une question | Court vers la souris et la suit, bulle orange |
 | Tâche terminée | Court vers la souris, saute de joie, bulle verte ; retourne à sa place après 30 secondes |
@@ -33,7 +33,9 @@ Quand Claude réfléchit, le chat change d'occupation toutes les quelques
 secondes : son ordinateur, puis une poêle, où il fait sauter une crêpe qui se
 retourne en l'air avant de retomber dans la poêle, puis une pelote de laine :
 il lève la patte, frappe la pelote, qui roule jusqu'à sa queue, et la queue la
-renvoie. Chaque réflexion commence par l'occupation suivante.
+renvoie ; puis un Rubik's cube, dont il tourne les rangées jusqu'à ce que la
+face soit toute verte, avant de le lever, fier de lui. Chaque réflexion
+commence par l'occupation suivante.
 
 Une réponse de Claude qui se termine par une question (un point d'interrogation
 dans son dernier paragraphe, hors code, liens et citations) compte comme une
@@ -45,8 +47,8 @@ Les chatons s'installent à droite du chat, par rangées de trois, sur trois
 niveaux légèrement superposés. Au-delà de neuf sous-agents, ils se serrent sur
 leurs rangées : chaque sous-agent garde son chaton. La bulle donne le nombre de
 sous-agents et leurs types. Comme le chat, un chaton dont le sous-agent
-réfléchit passe tour à tour de son ordinateur à sa poêle à crêpes et à sa
-pelote, chacun à son rythme.
+réfléchit passe tour à tour de son ordinateur à sa poêle à crêpes, à sa pelote
+et à son Rubik's cube, chacun à son rythme.
 
 ## Souris
 

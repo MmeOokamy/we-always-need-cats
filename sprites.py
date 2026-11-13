@@ -11,6 +11,7 @@ Every sprite is a list of text lines, one character per pixel:
     L  laptop screen (color depends on the activity)
     C  crepe              B  browned spots of the crepe
     Y  yarn               R  darker yarn strands
+    1-6  stickers of the Rubik's cube, a-f the same colors lighter
 
 After editing a drawing, run `python3 sprites.py preview.png` to see the result.
 """
@@ -135,6 +136,48 @@ _YARN_A = ["..KKK..", ".KYYRK.", "KYRRYYK", "KRYYRRK", "KYRRYYK", ".KYYRK.", "..
 _YARN_B = ["..KKK..", ".KRYYK.", "KYYRRYK", "KRRYYRK", "KYYRRYK", ".KRYYK.", "..KKK.."]
 
 
+# --- Rubik's cube (thinking): held in both paws, drawn on its own ------------
+
+_BODY_HOLDING = [  # both front paws hold the cube (_PAW_HOLD_*)
+    "..KFFFFFFFFFFK....",
+    ".KFFFWWWWWWFFFK...",
+    ".KFFFWWWWWWFFFK.KK",
+    ".KFFFFWWWWFFFFKKFK",
+    ".KFFFFFKKFFFFFFFK.",
+    ".KKKKKKKKKKKKKKK..",
+]
+_PAW_HOLD_LEFT = ["KK.", "KWK", "KK."]
+_PAW_HOLD_RIGHT = [".KK", "KWK", ".KK"]
+_LIGHTER = dict(zip("123456", "abcdef"))
+
+
+def _cube(rows, turning=None):
+    """Front face of the cube: 3 x 3 stickers of 2 x 2 pixels, one color
+    (1 to 6) each, in a checkerboard of two shades so that the grid shows
+    on a solved face. The row being turned sticks out by one pixel."""
+    lines = ["KKKKKKKK."]
+    for i, row in enumerate(rows):
+        stickers = "".join(
+            (_LIGHTER[c] if (i + j) % 2 else c) * 2 for j, c in enumerate(row)
+        )
+        line = f"K{stickers}K"
+        lines += [f".{line}" if i == turning else f"{line}."] * 2
+    lines.append("KKKKKKKK.")
+    return lines
+
+
+# Front face, scramble after scramble, then solved (all green).
+_CUBE_STEPS = [
+    ["253", "416", "362"],
+    ["335", "416", "362"],
+    ["335", "336", "362"],
+    ["333", "336", "336"],
+    ["333", "333", "363"],
+    ["333", "333", "333"],
+]
+_CUBE_TURNS = [0, 1, 2, 2, 2]  # row turned between two steps
+
+
 def _wide(lines):
     """Head lines widened to the 20 pixels of the pan bodies."""
     return [line + ".." for line in lines]
@@ -214,6 +257,12 @@ IMAGES = {
     "paw_down": _PAW_DOWN,
     "yarn_a": _YARN_A,
     "yarn_b": _YARN_B,
+    "cube_focus": _head("lowered") + _BODY_HOLDING,
+    "cube_happy": _head("happy", "open") + _BODY_HOLDING,
+    "paw_hold_left": _PAW_HOLD_LEFT,
+    "paw_hold_right": _PAW_HOLD_RIGHT,
+    **{f"cube_{n}": _cube(rows) for n, rows in enumerate(_CUBE_STEPS)},
+    **{f"cube_{n}_turning": _cube(_CUBE_STEPS[n], row) for n, row in enumerate(_CUBE_TURNS)},
     "run_a": _RUN_A,
     "run_b": _RUN_B,
     "sleep_a": _SLEEP_A,
@@ -250,6 +299,9 @@ ANIMATIONS = {
         "sit_a",
         "sit_a",
     ],
+    # Thinking too: the cat solves a Rubik's cube (see CUBE_SOLVE), then is
+    # pleased with itself.
+    "cube": ["cube_focus"] * 11 + ["cube_happy"] * 5,
     "run": ["run_a", "run_b"],
     "sleep": ["sleep_a"] * 3 + ["sleep_b"] * 3,
 }
@@ -285,6 +337,32 @@ YARN_PLAY = [
     [("yarn_a", 4, _GROUND, False)],
     [("yarn_b", 1, _GROUND, False)],
 ]
+
+# Rubik's cube and the paws holding it, frame by frame of the "cube" animation
+# (same form as YARN_PLAY): a turn of a row, then the next scramble, until the
+# face is solved; then the cat lifts the cube, proud of it.
+
+
+def _held(cube, line=8, turning=False):
+    # Columns and lines count the halo pixel around the cat: the cube sits
+    # under the chin, the eyes stay visible.
+    shift = 1 if turning else 0  # the turning row pushes the right paw
+    return [
+        (cube, 5, line, False),
+        ("paw_hold_left", 3, line + 3, False),
+        ("paw_hold_right", 12 + shift, line + 3, False),
+    ]
+
+
+CUBE_SOLVE = (
+    [
+        step
+        for n in range(len(_CUBE_TURNS))
+        for step in (_held(f"cube_{n}"), _held(f"cube_{n}_turning", turning=True))
+    ]
+    + [_held(f"cube_{len(_CUBE_TURNS)}")]
+    + [_held(f"cube_{len(_CUBE_TURNS)}", 7 if k % 2 == 0 else 8) for k in range(5)]
+)
 
 # Small symbols drawn above the cat.
 SYMBOLS = {
@@ -346,6 +424,19 @@ def palette(coat, activity="think"):
         "B": "#C98A3A",
         "Y": "#F03E3E",
         "R": "#B02525",
+        # Rubik's cube: white, red, green, blue, yellow, orange, then lighter
+        "1": "#E9ECEF",
+        "2": "#E03131",
+        "3": "#2F9E44",
+        "4": "#1C7ED6",
+        "5": "#FAB005",
+        "6": "#F76707",
+        "a": "#FFFFFF",
+        "b": "#FA5252",
+        "c": "#51CF66",
+        "d": "#4DABF7",
+        "e": "#FFD43B",
+        "f": "#FF922B",
     }
 
 

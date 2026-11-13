@@ -126,17 +126,19 @@ def kitten_places(count):
 
 
 # Frames per second of each animation.
-FPS = {"idle": 3, "question": 3, "done": 4, "work": 4, "think": 5, "play": 5, "run": 9, "sleep": 1.5}
+FPS = {"idle": 3, "question": 3, "done": 4, "work": 4, "think": 5, "play": 5, "cube": 5, "run": 9, "sleep": 1.5}
 
 # While thinking, the cat takes turns: its laptop, then crepes (two flips),
-# then a ball of yarn, each for THINK_PERIOD, and so on. Successive thinking
-# periods start at the next turn.
+# then a ball of yarn, then a Rubik's cube, each for THINK_PERIOD, and so on.
+# Successive thinking periods start at the next turn.
 THINK_PERIOD = 2 * len(sprites.ANIMATIONS["think"]) / FPS["think"]  # seconds
-THINK_TURNS = ("work", "think", "play")  # laptop, crepes, yarn
+THINK_TURNS = ("work", "think", "play", "cube")  # laptop, crepes, yarn, cube
+# What is drawn over the cat, frame by frame, in each turn but the laptop.
+OVERLAYS = {"play": sprites.YARN_PLAY, "cube": sprites.CUBE_SOLVE}
 
 
 def think_turn(count, since, now):
-    """Animation of a thinking cat or kitten: laptop, crepes or yarn."""
+    """Animation of a thinking cat or kitten: laptop, crepes, yarn or cube."""
     return THINK_TURNS[(count + int((now - since) / THINK_PERIOD)) % len(THINK_TURNS)]
 
 
@@ -146,14 +148,14 @@ def turn_index(animation, since, now):
 
 
 def overlays(animation, index):
-    """What is drawn over a cat for this frame: the flying crepe, or the yarn
-    ball and the raised paw, as [(sprite, column, line, mirrored)]."""
+    """What is drawn over a cat for this frame: the flying crepe, the yarn
+    ball and the raised paw, or the cube and the paws holding it, as
+    [(sprite, column, line, mirrored)]."""
     if animation == "think":
         flight = sprites.CREPE_FLIGHT[index % len(sprites.CREPE_FLIGHT)]
         return [flight] if flight else []
-    if animation == "play":
-        return sprites.YARN_PLAY[index % len(sprites.YARN_PLAY)]
-    return []
+    frames = OVERLAYS.get(animation)
+    return frames[index % len(frames)] if frames else []
 
 
 BUBBLE_COLOR = {"question": "#E8590C", "done": "#2F9E44"}
@@ -189,8 +191,8 @@ def pixmap(name, coat, activity, mirror, scale):
 
 
 def new_kitten(agent_type, number):
-    """A kitten that starts thinking. number shifts its laptop, crepes and
-    yarn turns, so that neighbouring kittens do not all play at once."""
+    """A kitten that starts thinking. number shifts its turns (laptop, crepes,
+    yarn, cube), so that neighbouring kittens do not all play at once."""
     return {
         "type": agent_type,
         "activity": "think",
@@ -208,7 +210,8 @@ def set_kitten_activity(kitten, activity):
 
 def kitten_frame(kitten, number, now):
     """(sprite, what is drawn over it) of a kitten: like the cat, a thinking
-    kitten swaps its laptop for a frying pan or a ball of yarn now and then."""
+    kitten swaps its laptop for a frying pan, a ball of yarn or a Rubik's cube
+    now and then."""
     if kitten["activity"] == "think":
         animation = think_turn(kitten["think_count"], kitten["think_since"], now)
         if animation != "work":
@@ -308,7 +311,7 @@ class Cat(QWidget):
         return self.state == "work" and self.activity == "think"
 
     def think_animation(self):
-        """While thinking: laptop, crepes or yarn, in turn (see THINK_PERIOD)."""
+        """While thinking: laptop, crepes, yarn or cube, in turn (see THINK_PERIOD)."""
         return think_turn(self.think_count, self.think_since, time.monotonic())
 
     def acknowledge(self):
@@ -375,7 +378,8 @@ class Cat(QWidget):
         if self.running:
             return "run"
         if self.thinking():
-            # thinking: the cat types, flips a crepe or plays with yarn, in turn
+            # thinking: the cat types, flips a crepe, plays with yarn or solves
+            # a Rubik's cube, in turn
             return self.think_animation()
         return self.state
 
@@ -410,9 +414,10 @@ class Cat(QWidget):
         """Redraw the window when what it shows has changed."""
         animation = self.animation()
         frames = sprites.ANIMATIONS[animation]
-        if animation in ("think", "play"):
+        if animation in THINK_TURNS:
             # Counted from the start of the turn: every series of crepes starts
-            # with a throw, every yarn game with the ball in front of the cat.
+            # with a throw, every yarn game with the ball in front of the cat,
+            # every cube scrambled.
             index = turn_index(animation, self.think_since, time.monotonic())
         else:
             index = int(time.monotonic() * FPS[animation])
@@ -468,7 +473,7 @@ class Cat(QWidget):
         y = HEIGHT - image.height() - jump
         painter.drawPixmap(x, y, image)
 
-        # The flying crepe, or the yarn ball and the raised paw (thinking)
+        # The flying crepe, the yarn ball, the cube (thinking)
         for name, column, line, flipped in overlays(animation, self.index):
             width = len(sprites.IMAGES[name][0])
             if self.mirror:  # the cat looks the other way
@@ -507,7 +512,7 @@ class Cat(QWidget):
             small = pixmap(name, coat, kitten["activity"], False, S2)
             y = HEIGHT - small.height() - row * KITTEN_ROW_STEP
             painter.drawPixmap(x, y, small)
-            for item, column, line, flipped in items:  # crepe in the air, yarn, paw
+            for item, column, line, flipped in items:  # crepe, yarn, cube, paws
                 item = pixmap(item, coat, kitten["activity"], flipped, S2)
                 painter.drawPixmap(x + column * S2, y + line * S2, item)
 
