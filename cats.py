@@ -52,7 +52,9 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import QApplication, QMenu, QWidget
 
+import popup
 import sprites
+import updates
 import usage_common
 
 APP_NAME = "we-always-need-cats"
@@ -378,6 +380,8 @@ class Cat(QWidget):
             return []
         label = {"idle": "idle", "sleep": "asleep"}.get(self.state, self.text)
         lines = [self.project or "Claude Code", label]
+        if self.hovered and self.app.updater.available():
+            lines.append(updates.texts("en")["bubble"])
         if self.kittens:
             types = sorted({k["type"] or "agent" for k in self.kittens.values()})
             count = len(self.kittens)
@@ -586,8 +590,10 @@ class Cat(QWidget):
         usage.setChecked(usage_common.file_setting("usage_cat") is not False)
         usage.toggled.connect(self.app.set_usage_cat)
         menu.addAction("Usage cat only (hide session cats)", self.app.usage_only)
+        menu.addSeparator()
+        self.app.updater.add_menu(menu)
         menu.addAction("Quit we-always-need-cats", QApplication.instance().quit)
-        menu.exec(position)
+        popup.show_menu(menu, position)
 
     def reset_home(self):
         self.home = None
@@ -642,6 +648,9 @@ class App(QObject):
         self.housekeeping = QTimer(self)
         self.housekeeping.timeout.connect(self.clean_up)
         self.housekeeping.start(2000)
+        # Updates: daily check, Updates submenu, restart after an update.
+        self.updater = updates.Updater("en")
+        self.restarting = False
 
     # --- Mouse position -----------------------------------------------------
 
@@ -835,7 +844,11 @@ class App(QObject):
                 if cat.state == "work":
                     cat.set_state("question", "waiting for your answer")
         elif event == "Stop":
-            cat.set_state("done", "all done")
+            if m.get("asks"):
+                # Claude's turn ends on a question: it waits for an answer.
+                cat.set_state("question", "waiting for your answer")
+            else:
+                cat.set_state("done", "all done")
         elif event == "StopFailure":
             cat.set_state("question", "stopped on an error")
         cat.refresh()
@@ -870,6 +883,10 @@ class App(QObject):
                 cat.follows = False
             if cat.state == "idle" and elapsed > SETTINGS["sleep_delay"]:
                 cat.set_state("sleep")
+        if self.updater.tick():
+            self.restarting = True  # a new version is installed: restart on it
+            QApplication.instance().quit()
+            return
         if not self.cats and now - self.empty_since > 15:
             QApplication.instance().quit()
 
@@ -895,7 +912,10 @@ def main():
     application.aboutToQuit.connect(app.shutdown)
     for stop_signal in (signal.SIGINT, signal.SIGTERM):
         signal.signal(stop_signal, lambda *_: application.quit())
-    return application.exec()
+    code = application.exec()
+    if app.restarting:
+        updates.restart()
+    return code
 
 
 if __name__ == "__main__":

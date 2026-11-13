@@ -9,6 +9,7 @@ gets in Claude Code's way.
 
 import json
 import os
+import re
 import sys
 
 import compat
@@ -33,6 +34,50 @@ def tool_detail(tool_input):
         if tool_input.get(key):
             return short(tool_input[key], 40)
     return ""
+
+
+def last_text_in_transcript(path):
+    """Text of Claude's last message, read from the end of the session
+    transcript (for Claude Code versions that do not send it with Stop)."""
+    try:
+        with open(path, "rb") as f:
+            f.seek(0, os.SEEK_END)
+            f.seek(max(0, f.tell() - 256 * 1024))
+            lines = f.read().decode("utf-8", "replace").splitlines()
+    except (OSError, TypeError):
+        return ""
+    for line in reversed(lines):
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        if entry.get("type") == "user" and not entry.get("isSidechain"):
+            return ""  # the user spoke last: no answer from Claude after that
+        if entry.get("type") != "assistant" or entry.get("isSidechain"):
+            continue
+        content = (entry.get("message") or {}).get("content")
+        texts = [
+            block.get("text", "")
+            for block in content if isinstance(block, dict) and block.get("type") == "text"
+        ] if isinstance(content, list) else []
+        if any(texts):
+            return "\n".join(texts)
+    return ""
+
+
+def asks_something(text):
+    """True when Claude's last message ends with a question: then Claude waits
+    for an answer rather than having finished. A heuristic: a question mark in
+    the last paragraph, outside code, links and quotes."""
+    text = re.sub(r"```.*?(```|$)", "", text or "", flags=re.S)  # code blocks
+    paragraphs = [p for p in re.split(r"\n\s*\n", text) if p.strip()]
+    if not paragraphs:
+        return False
+    last = paragraphs[-1]
+    last = re.sub(r"`[^`]*`", "", last)  # inline code
+    last = re.sub(r"https?://\S+", "", last)  # links (?query)
+    last = re.sub(r"«[^»]*»|\"[^\"]*\"", "", last)  # quoted questions
+    return "?" in last
 
 
 def start_program():
@@ -75,6 +120,11 @@ def main():
         "message": short(e.get("message"), 80),
         "pid": compat.claude_pid(),
     }
+    if event == "Stop":
+        text = e.get("last_assistant_message")
+        if not isinstance(text, str):
+            text = last_text_in_transcript(e.get("transcript_path"))
+        message["asks"] = asks_something(text)
     data = json.dumps(message).encode()
     if compat.instance_running(compat.SESSION_PORT):
         compat.send(compat.SESSION_PORT, data)

@@ -22,7 +22,7 @@ Claude Code session is doing.
 | Claude is working | Types on its laptop; the bubble describes the action |
 | Claude is thinking (between two actions) | Flips crepes in a frying pan, alternating with its laptop |
 | Subagents running | Kittens work next to it, one per subagent |
-| A question or a permission prompt | Runs to the mouse and follows it, orange bubble |
+| A question or a permission prompt, or an answer from Claude ending with a question | Runs to the mouse and follows it, orange bubble |
 | Task finished | Runs to the mouse, jumps for joy, green bubble; goes home after 30 seconds |
 | Session closed | The cat disappears |
 
@@ -33,6 +33,11 @@ the cat also swaps its laptop for a frying pan now and then: it tosses a crepe,
 which turns over in the air before landing back in the pan. It changes every
 two crepes during a long thinking period, and one thinking period out of two
 starts with the crepes.
+
+An answer from Claude that ends with a question (a question mark in its last
+paragraph, outside code, links and quotes) counts as a question rather than a
+finished task: Claude waits for an answer. It is a guess: a request without a
+question mark ("Tell me when…") stays a finished task.
 
 The kittens sit on the right of the cat, in rows of three, up to three rows
 stacked a little over each other. Past nine subagents, they squeeze together on
@@ -48,7 +53,8 @@ alternates between its laptop and its crepe pan, each at its own pace.
 - Right click: send the cat home, dismiss that cat, choose when the cats follow
   the mouse, show or hide the usage cat (**Usage cat** checkbox, see
   [Hiding the usage cat](#hiding-the-usage-cat)), keep the usage cat only (see
-  [Usage cat only](#usage-cat-only)), or quit the program.
+  [Usage cat only](#usage-cat-only)), manage updates (see
+  [Updates](#updates)), or quit the program.
 
 The **Follow the mouse** submenu has two checkboxes, shared by every session
 cat and saved in `config.json`:
@@ -178,6 +184,55 @@ To install them for a single project instead:
 python3 install.py --settings /path/to/project/.claude/settings.json
 ```
 
+## Updates
+
+The cats check once a day whether a new version is out on GitHub
+([releases](https://github.com/MmeOokamy/we-always-need-cats/releases)). Only
+releases are offered, not every change merged between two releases. When a new
+release is out, the bubble of a hovered cat says so ("update available"), and the
+**Updates** submenu of the right-click menu (**Mises à jour** on the usage cat
+when it speaks French) gives:
+
+- the installed version ("1.0.0+": newer than release 1.0.0, updated by hand
+  with `git pull`);
+- the state: never checked, up to date (with the time of the check), new
+  version available with the number of changes, or check failed;
+- **What changed**: the list of the coming changes;
+- **Check for updates**: check right now;
+- **Update and restart**: install the new version. The cats restart on it at
+  once, usage cat included; the session cats come back at the next Claude Code
+  event.
+
+From a terminal:
+
+```bash
+python3 updates.py           # check, then update if there is something new
+python3 updates.py --check   # check only
+```
+
+The update moves the clone forward to the latest release (`git fetch --tags`,
+then `git merge --ff-only vX.Y.Z`): it never overwrites anything. With local
+changes or commits that GitHub does not have, it stops and says to update by
+hand. The cats must have been
+installed with `git clone`; `config.json` is left alone. A new version that
+changes the hooks or the status line says so in its changes: then run
+`python3 install.py` again.
+
+### Publishing a release
+
+Releases are `vX.Y.Z` tags on `main` (semantic versioning: the last number for
+a fix, the middle one for a new feature, the first one for a change that asks
+for action, such as running `install.py` again):
+
+```bash
+git switch main && git pull
+git tag -a v1.1.0 -m "v1.1.0"
+git push origin v1.1.0
+```
+
+Then, on GitHub, **Releases**, **Draft a new release**: pick the tag and
+describe the changes. The cats offer the release as soon as the tag is pushed.
+
 ## Settings
 
 Create a `config.json` file next to `cats.py` holding only the values you want
@@ -236,11 +291,17 @@ For the usage cat (which also follows `scale`):
 - `hook.py` is called by Claude Code on every event (hooks declared in
   `~/.claude/settings.json`). It sends the essentials of the event to the
   program over a local socket, and starts the program if it is not running.
+  At the end of an answer (`Stop`), it checks whether Claude's last message
+  ends with a question (`last_assistant_message`, or the end of the transcript
+  for Claude Code versions that do not send it).
 - `cats.py` is the program showing the cats (Python and PyQt6). It quits by
   itself fifteen seconds after the last cat is gone.
 - `kwin_cursor.js` is a KWin script loaded by `cats.py`. Under Wayland an
   application cannot read the mouse position: KWin reports it.
 - `sprites.py` holds the drawings and the colors.
+- `popup.py` opens the right-click menus and closes them on a click outside
+  (the cats never take the focus, which keeps a plain menu from seeing that
+  click under Wayland).
 - `usage_statusline.py` is called by Claude Code at every status line refresh.
   It receives the limits of the account (`rate_limits`), saves them to
   `~/.cache/usage-cat/state.json`, starts `usage_cat.py` if it is not running
@@ -248,6 +309,9 @@ For the usage cat (which also follows `scale`):
 - `usage_cat.py` shows the usage cat and reads that file again every second;
   `usage_common.py` holds its settings, thresholds and texts.
 - `install.py` registers and removes the hooks and the status line.
+- `updates.py` checks for and installs updates. The result of the last check
+  is in `~/.cache/we-always-need-cats/updates.json`; after an update, the
+  `updated` file next to it asks the cats to restart.
 
 ## Editing the drawings
 

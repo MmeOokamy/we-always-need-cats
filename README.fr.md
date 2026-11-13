@@ -22,7 +22,7 @@ montre ce que fait chaque session Claude Code.
 | Claude travaille | Tape sur son ordinateur ; la bulle décrit l'action |
 | Claude réfléchit (entre deux actions) | Fait sauter des crêpes dans une poêle, en alternance avec son ordinateur |
 | Sous-agents en cours | Des chatons travaillent à côté de lui, un par sous-agent |
-| Question ou demande d'autorisation | Court vers la souris et la suit, bulle orange |
+| Question ou demande d'autorisation, ou réponse de Claude qui se termine par une question | Court vers la souris et la suit, bulle orange |
 | Tâche terminée | Court vers la souris, saute de joie, bulle verte ; retourne à sa place après 30 secondes |
 | Session fermée | Le chat disparaît |
 
@@ -33,6 +33,12 @@ Quand Claude réfléchit, l'ordinateur laisse aussi place de temps en temps à u
 poêle : le chat fait sauter une crêpe, qui se retourne en l'air avant de
 retomber dans la poêle. Il change toutes les deux crêpes pendant une longue
 réflexion, et une réflexion sur deux commence par les crêpes.
+
+Une réponse de Claude qui se termine par une question (un point d'interrogation
+dans son dernier paragraphe, hors code, liens et citations) compte comme une
+question et non comme une tâche terminée : Claude attend une réponse. C'est une
+estimation : une demande sans point d'interrogation (« Dis-moi quand… ») reste
+une tâche terminée.
 
 Les chatons s'installent à droite du chat, par rangées de trois, sur trois
 niveaux légèrement superposés. Au-delà de neuf sous-agents, ils se serrent sur
@@ -49,8 +55,8 @@ rythme.
 - Clic droit : remettre le chat à sa place, renvoyer ce chat, choisir quand les
   chats suivent la souris, afficher ou masquer le chat d'usage (case **Usage
   cat**, voir [Masquer le chat d'usage](#masquer-le-chat-dusage)), ne garder
-  que le chat d'usage (voir [Chat d'usage seul](#chat-dusage-seul)), ou fermer
-  le programme.
+  que le chat d'usage (voir [Chat d'usage seul](#chat-dusage-seul)), gérer les
+  mises à jour (voir [Mises à jour](#mises-à-jour)), ou fermer le programme.
 
 Le sous-menu **Follow the mouse** contient deux cases à cocher, communes à tous
 les chats de session et enregistrées dans `config.json` :
@@ -186,6 +192,58 @@ Pour ne les installer que sur un projet :
 python3 install.py --settings /chemin/du/projet/.claude/settings.json
 ```
 
+## Mises à jour
+
+Les chats vérifient une fois par jour si une nouvelle version est publiée sur
+GitHub ([releases](https://github.com/MmeOokamy/we-always-need-cats/releases)).
+Seules les versions publiées sont proposées, pas chaque changement fusionné
+entre deux versions. Quand une nouvelle version est publiée, la bulle d'un chat survolé l'indique (« update
+available »), et le sous-menu **Updates** du clic droit (ou **Mises à jour**
+sur le chat d'usage) donne :
+
+- la version installée (« 1.0.0+ » : plus récente que la version 1.0.0,
+  mise à jour à la main avec `git pull`) ;
+- l'état : jamais vérifié, à jour (avec l'heure de la vérification), nouvelle
+  version disponible avec le nombre de changements, ou vérification
+  impossible ;
+- **What changed** / **Nouveautés** : la liste des changements à venir ;
+- **Check for updates** / **Vérifier les mises à jour** : vérifier tout de
+  suite ;
+- **Update and restart** / **Mettre à jour et redémarrer** : installer la
+  nouvelle version. Les chats redémarrent aussitôt dessus, chat d'usage
+  compris ; les chats de session réapparaissent au prochain événement de
+  Claude Code.
+
+Depuis un terminal :
+
+```bash
+python3 updates.py           # vérifie, puis met à jour s'il y a du nouveau
+python3 updates.py --check   # vérifie seulement
+```
+
+La mise à jour avance le clone jusqu'à la dernière version publiée (`git fetch
+--tags`, puis `git merge --ff-only vX.Y.Z`) : elle n'écrase jamais rien. Avec
+des modifications locales ou des commits absents de GitHub, elle s'arrête et
+indique de mettre à jour à la main. Il faut
+avoir installé les chats avec `git clone` ; `config.json` n'est pas touché.
+Une nouvelle version qui change les hooks ou la status line le précise dans ses
+changements : relancer alors `python3 install.py`.
+
+### Publier une version
+
+Les versions sont des tags `vX.Y.Z` sur `main` (version sémantique : le dernier
+nombre pour une correction, celui du milieu pour une nouveauté, le premier pour
+un changement qui demande d'agir, comme relancer `install.py`) :
+
+```bash
+git switch main && git pull
+git tag -a v1.1.0 -m "v1.1.0"
+git push origin v1.1.0
+```
+
+Puis, sur GitHub, **Releases**, **Draft a new release** : choisir le tag et
+décrire les changements. Les chats proposent la version dès le push du tag.
+
 ## Réglages
 
 Créer un fichier `config.json` à côté de `cats.py`, avec uniquement les valeurs
@@ -244,12 +302,18 @@ Pour le chat d'usage (qui suit aussi `scale`) :
 
 - `hook.py` est appelé par Claude Code à chaque événement (hooks déclarés dans
   `~/.claude/settings.json`). Il envoie l'essentiel de l'événement au programme
-  par une socket locale, et lance le programme s'il ne tourne pas.
+  par une socket locale, et lance le programme s'il ne tourne pas. À la fin
+  d'une réponse (`Stop`), il regarde si le dernier message de Claude se termine
+  par une question (`last_assistant_message`, ou la fin de la transcription
+  pour les versions de Claude Code qui ne l'envoient pas).
 - `cats.py` est le programme qui affiche les chats (Python et PyQt6). Il
   s'arrête de lui-même quinze secondes après le départ du dernier chat.
 - `kwin_cursor.js` est un script KWin chargé par `cats.py`. Sous Wayland, une
   application ne peut pas lire la position de la souris : KWin la transmet.
 - `sprites.py` contient les dessins et les couleurs.
+- `popup.py` ouvre les menus du clic droit et les ferme au clic à côté (les
+  chats ne prennent jamais le focus, ce qui empêche un menu ordinaire de voir
+  ce clic sous Wayland).
 - `usage_statusline.py` est appelé par Claude Code à chaque rafraîchissement
   de la status line. Il reçoit les limites du compte (`rate_limits`), les
   enregistre dans `~/.cache/usage-cat/state.json`, lance `usage_cat.py` s'il ne
@@ -257,6 +321,10 @@ Pour le chat d'usage (qui suit aussi `scale`) :
 - `usage_cat.py` affiche le chat d'usage et relit ce fichier chaque seconde ;
   `usage_common.py` regroupe ses réglages, ses seuils et ses textes.
 - `install.py` déclare et retire les hooks et la status line.
+- `updates.py` vérifie et installe les mises à jour. Le résultat de la dernière
+  vérification est dans `~/.cache/we-always-need-cats/updates.json` ; après
+  une mise à jour, le fichier `updated` du même dossier demande aux chats de
+  redémarrer.
 
 ## Modifier les dessins
 
