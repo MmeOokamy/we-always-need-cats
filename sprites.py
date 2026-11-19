@@ -464,15 +464,15 @@ def draw(lines, colors, mirror=False, halo=HALO):
     return image
 
 
-def check(images=None):
+def check(images=None, cell_w=CELL_W, cell_h=CELL_H):
     """Report inconsistent line lengths (helps while editing the drawings)."""
     errors = []
     for name, lines in (images or IMAGES).items():
         lengths = {len(line) for line in lines}
         if len(lengths) > 1:
             errors.append(f"{name}: lines of different lengths {sorted(lengths)}")
-        if max(lengths) + 2 > CELL_W or len(lines) + 2 > CELL_H:
-            errors.append(f"{name}: larger than the {CELL_W}x{CELL_H} cell")
+        if max(lengths) + 2 > cell_w or len(lines) + 2 > cell_h:
+            errors.append(f"{name}: larger than the {cell_w}x{cell_h} cell")
     return errors
 
 
@@ -484,10 +484,11 @@ def _preview(path, zoom=8, theme=None, background="#6C8EAD"):
     theme = theme or sys.modules[__name__]
     app = QGuiApplication.instance() or QGuiApplication([])
     names = list(theme.IMAGES)
+    cell_w, cell_h = theme.CELL_W, theme.CELL_H
     columns = 5
     rows = (len(names) + columns - 1) // columns
     margin = 2
-    step_w, step_h = (CELL_W + margin) * zoom, (CELL_H + margin) * zoom
+    step_w, step_h = (cell_w + margin) * zoom, (cell_h + margin) * zoom
     sheet = QImage(columns * step_w, rows * step_h * 2, QImage.Format.Format_ARGB32)
     sheet.fill(QColor(background))
     painter = QPainter(sheet)
@@ -496,8 +497,8 @@ def _preview(path, zoom=8, theme=None, background="#6C8EAD"):
             coat = coats[i % len(coats)]
             activity = list(theme.SCREENS)[i % len(theme.SCREENS)]
             image = theme.draw(theme.IMAGES[name], theme.palette(coat, activity))
-            x = (i % columns) * step_w + (CELL_W - image.width()) // 2 * zoom + zoom
-            y = (i // columns + band * rows) * step_h + (CELL_H - image.height()) * zoom + zoom
+            x = (i % columns) * step_w + (cell_w - image.width()) // 2 * zoom + zoom
+            y = (i // columns + band * rows) * step_h + (cell_h - image.height()) * zoom + zoom
             painter.drawImage(x, y, image.scaled(image.width() * zoom, image.height() * zoom))
     painter.end()
     sheet.save(path)

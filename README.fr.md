@@ -156,21 +156,26 @@ pour toutes les sessions ouvertes sur le même dossier de projet, et il est
 retenu pour ce dossier (`looks` dans `config.json`). Le réglage `theme` donne
 l'apparence des autres projets.
 
-- Un Reaper de classe Sovereign par session, chacun avec sa coque ; un petit
-  destroyer par sous-agent en cours d'exécution, ses feux de la couleur de son
+- Un Reaper de classe Sovereign par session, une animation en pixel art
+  affichée à sa taille (environ 80 x 140 pixels), chacun avec sa coque (acier
+  bleuté, bronze, rouille, cendre...). Un destroyer par sous-agent en cours
+  d'exécution : le même Reaper à demi-taille, ses feux de la couleur de son
   type d'agent.
 - Au travail : la lueur sous la coque prend la couleur de l'activité (les
   mêmes couleurs que l'écran de l'ordinateur des chats), son cœur garde la
   couleur du Reaper.
 - Quand Claude réfléchit, le Reaper change d'occupation : il tire son rayon
-  sur un petit vaisseau, qui l'esquive ; il charge un relais cosmodésique, qui
-  envoie une traînée au loin ; il referme les bras de la Citadelle, étape par
-  étape.
-- Question : la corne, lueur grande ouverte. Tâche terminée : il lève une
-  patte, le cœur incandescent. Endormi : en dormance, couché, lueur éteinte.
-  En déplacement : il vole, les pattes traînant derrière lui.
+  au sol, qui explose ; ses feux se chargent ; il se balance sur ses griffes.
+- Question : ses feux rougeoient. Tâche terminée : il saute, au milieu des
+  étoiles. Endormi : en dormance, assombri. En déplacement : il avance en se
+  balançant.
 
 Le chat d'usage suit aussi le thème : sa lueur indique le niveau d'usage.
+
+L'animation (`art/reaper.gif`) est l'œuvre de son auteur, trouvée sur
+DeviantArt (deviation d4ns89d) et utilisée pour ce thème ; ses droits restent
+à son auteur. `python3 tools/make_reaper_frames.py` (Pillow) en tire
+`art/reaper-frames.png`, les images lues par les chats.
 
 
 - Linux avec une session graphique (Wayland ou X11)
@@ -340,7 +345,9 @@ Pour le chat d'usage (qui suit aussi `scale`) :
 - `kwin_cursor.js` est un script KWin chargé par `cats.py`. Sous Wayland, une
   application ne peut pas lire la position de la souris : KWin la transmet.
 - `sprites.py` contient les dessins et les couleurs ; `sprites_reapers.py`
-  ceux du thème Reapers, et `theme.py` charge le module du thème choisi.
+  ceux du thème Reapers (les images de `art/reaper-frames.png` et leurs
+  variantes : coques, lueur, destroyers), et `theme.py` charge le module du
+  thème choisi.
 - `popup.py` ouvre les menus du clic droit et les ferme au clic à côté (les
   chats ne prennent jamais le focus, ce qui empêche un menu ordinaire de voir
   ce clic sous Wayland).

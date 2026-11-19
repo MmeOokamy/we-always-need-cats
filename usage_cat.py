@@ -52,7 +52,10 @@ sprites = theme.load()
 
 S = max(1, int(SETTINGS["scale"]))  # cat scale
 S2 = max(1, S // 2)  # scale of the small symbols
-CAT_W, CAT_H = sprites.CELL_W * S, sprites.CELL_H * S
+# Screen pixels per drawing pixel (PIXEL: the look's drawing pixel, in cat
+# pixels; the Reaper is shown at its own size).
+SCALE = max(1, round(S * getattr(sprites, "PIXEL", 1)))
+CAT_W, CAT_H = sprites.CELL_W * SCALE, sprites.CELL_H * SCALE
 SYMBOLS_H = 7 * S
 BUBBLE_H = 72
 GAUGE_H = 26
@@ -262,7 +265,7 @@ class UsageCat(QWidget):
         """Redraw the window when what it shows has changed."""
         now = time.time() if now is None else now
         animation = self.animation(now)
-        index = int(time.monotonic() * FPS[animation])
+        index = int(time.monotonic() * getattr(sprites, "FPS", {}).get(animation, FPS[animation]))
         lines = self.bubble_lines(now)
         gauges = tuple(common.window(self.state, name, now)[0] for name in common.WINDOWS)
         signature = (animation, index, self.level, tuple(lines), gauges)
@@ -311,9 +314,9 @@ class UsageCat(QWidget):
         frames = FRAMES[animation]
 
         # The cat
-        image = pixmap(frames[index % len(frames)], self.coat, self.level, S)
+        image = pixmap(frames[index % len(frames)], self.coat, self.level, SCALE)
         jump = 2 * S if (animation == "done" and even) else 0
-        x = (CAT_W - image.width()) // 2
+        x = max(0, (CAT_W - image.width()) // 2)  # a wider frame (the Reaper's beam) starts at the left
         painter.drawPixmap(x, CAT_BOTTOM - image.height() - jump, image)
 
         # The symbols above the cat

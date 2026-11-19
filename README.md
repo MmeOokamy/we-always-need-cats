@@ -150,20 +150,24 @@ to every session open on the same project folder, and is remembered for that
 folder (`looks` in `config.json`). The `theme` setting gives the look of the
 other projects.
 
-- Each session gets a Sovereign-class Reaper, each with its own hull; each
-  running subagent gets a small destroyer, its lights in the color of its
-  agent type.
+- Each session gets a Sovereign-class Reaper, a pixel art animation shown at
+  its own size (about 80 x 140 pixels), each with its own hull (steel blue,
+  bronze, rust, ash...). Each running subagent gets a destroyer, the same
+  Reaper at half size, its lights in the color of its agent type.
 - Working: the glow under the hull takes the color of the activity (same
   colors as the laptop screen of the cats), its core keeps the color of the
   Reaper.
-- Thinking, the Reaper takes turns: it fires its beam at a small ship, which
-  dodges; it charges a mass relay, which sends a streak away; it closes the
-  arms of the Citadel, one step at a time.
-- Question: the horn, the glow wide open. Task finished: it raises a leg, its
-  core burning bright. Asleep: dormant, lying down, glow dimmed. Moving: flies,
-  legs trailing behind.
+- Thinking, the Reaper takes turns: it fires its beam at the ground, which
+  explodes; its lights charge up; it sways on its claws.
+- Question: its lights glow red. Task finished: it jumps, among stars.
+  Asleep: dormant, darkened. Moving: it sways along.
 
 The usage cat follows the theme too: its glow shows the usage level.
+
+The animation (`art/reaper.gif`) is the work of its author, from DeviantArt
+(deviation d4ns89d), used for this theme; its rights stay with its author.
+`python3 tools/make_reaper_frames.py` (Pillow) turns it into
+`art/reaper-frames.png`, the frames read by the cats.
 
 
 - Linux with a graphical session (Wayland or X11)
@@ -328,7 +332,9 @@ For the usage cat (which also follows `scale`):
 - `kwin_cursor.js` is a KWin script loaded by `cats.py`. Under Wayland an
   application cannot read the mouse position: KWin reports it.
 - `sprites.py` holds the drawings and the colors; `sprites_reapers.py` those
-  of the Reapers theme, and `theme.py` loads the module of the chosen theme.
+  of the Reapers theme (the frames of `art/reaper-frames.png` and their
+  variants: hulls, glow, destroyers), and `theme.py` loads the module of the
+  chosen theme.
 - `popup.py` opens the right-click menus and closes them on a click outside
   (the cats never take the focus, which keeps a plain menu from seeing that
   click under Wayland).

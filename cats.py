@@ -100,33 +100,60 @@ def save_setting(key, value):
 
 S = max(1, int(SETTINGS["scale"]))  # cat scale
 S2 = max(1, S // 2)  # kitten scale
-CAT_W, CAT_H = sprites.CELL_W * S, sprites.CELL_H * S
-KITTEN_W, KITTEN_H = sprites.CELL_W * S2 + 2, sprites.CELL_H * S2
+
+
+def look_scale(look, scale):
+    """Screen pixels per drawing pixel of a look (PIXEL: its drawing pixel,
+    in cat pixels). Whole numbers keep pixel art sharp; under 1 (the small
+    Reapers), the drawing is shrunk."""
+    value = scale * getattr(look, "PIXEL", 1)
+    return max(1, round(value)) if value >= 1 else value
+
+
 # Kittens sit on the right of the cat, in rows of KITTEN_COLUMNS, up to
 # KITTEN_ROWS rows stacked a little over each other. With more kittens than
 # that, they squeeze together on their rows: every subagent keeps its kitten.
 KITTEN_COLUMNS = 3
 KITTEN_ROWS = 3
-KITTEN_ROW_STEP = KITTEN_H * 5 // 6
 SYMBOLS_H = 7 * S
 BUBBLE_H = 64
-WIDTH = CAT_W + 4 + KITTEN_COLUMNS * KITTEN_W
-HEIGHT = BUBBLE_H + SYMBOLS_H + CAT_H
-CAT_TOP = HEIGHT - CAT_H
 
 
+class Geometry:
+    """Window of a look: a Reaper at its own size needs a larger one."""
 
-def kitten_places(count):
+    def __init__(self, look):
+        self.scale = look_scale(look, S)
+        self.small = look_scale(look, S2)
+        self.cat_w = round(look.CELL_W * self.scale)
+        self.cat_h = round(look.CELL_H * self.scale)
+        self.kitten_w = round(look.CELL_W * self.small) + 2
+        self.kitten_h = round(look.CELL_H * self.small)
+        self.row_step = self.kitten_h * 5 // 6
+        self.width = self.cat_w + 4 + KITTEN_COLUMNS * self.kitten_w
+        self.height = BUBBLE_H + SYMBOLS_H + self.cat_h
+        self.cat_top = self.height - self.cat_h
+
+
+GEOMETRY = {name: Geometry(look) for name, look in LOOKS.items()}
+
+
+def fps(look, animation):
+    """Frames per second of an animation: the look's own pace, if it has one."""
+    return getattr(look, "FPS", {}).get(animation, FPS[animation])
+
+
+def kitten_places(count, geo):
     """(index, x, row) of each kitten: rows filled from the bottom, left to
     right; past KITTEN_ROWS full rows, more columns, closer together."""
     if not count:
         return []
     rows = min(KITTEN_ROWS, -(-count // KITTEN_COLUMNS))
     columns = max(KITTEN_COLUMNS, -(-count // rows))
-    room = KITTEN_COLUMNS * KITTEN_W - KITTEN_W  # left edge of the last column
-    step = min(KITTEN_W, room / (columns - 1)) if columns > 1 else 0
+    room = KITTEN_COLUMNS * geo.kitten_w - geo.kitten_w  # left edge of the last column
+    step = min(geo.kitten_w, room / (columns - 1)) if columns > 1 else 0
     return [
-        (i, CAT_W + 4 + int((i % columns) * step), i // columns)
+        (i, geo.cat_w + 4 + int((i % columns) * step), i // columns)
         for i in range(count)
     ]
 
@@ -137,7 +164,7 @@ FPS = {"idle": 3, "question": 3, "done": 4, "work": 4, "think": 5, "play": 5, "c
 # While thinking, the cat takes turns: its laptop, then crepes (two flips),
 # then a ball of yarn, then a Rubik's cube, each for THINK_PERIOD, and so on.
 # Successive thinking periods start at the next turn.
-THINK_PERIOD = 2 * len(sprites.ANIMATIONS["think"]) / FPS["think"]  # seconds
+THINK_PERIOD = 2 * len(LOOKS["cats"].ANIMATIONS["think"]) / FPS["think"]  # seconds (every look)
 THINK_TURNS = ("work", "think", "play", "cube")  # laptop, crepes, yarn, cube
 # What is drawn over the cat, frame by frame, in each turn but the laptop.
 
@@ -147,9 +174,9 @@ def think_turn(count, since, now):
     return THINK_TURNS[(count + int((now - since) / THINK_PERIOD)) % len(THINK_TURNS)]
 
 
-def turn_index(animation, since, now):
+def turn_index(look, animation, since, now):
     """Frame number since the start of the current thinking turn."""
-    return int(((now - since) % THINK_PERIOD) * FPS[animation])
+    return int(((now - since) % THINK_PERIOD) * fps(look, animation))
 
 
 def overlays(sprites, animation, index):
@@ -191,9 +218,11 @@ def pixmap(sprites, name, coat, activity, mirror, scale):
     key = (sprites.__name__, name, coat["name"], activity, mirror, scale)
     if key not in _pixmaps:
         image = sprites.draw(sprites.IMAGES[name], sprites.palette(coat, activity), mirror)
-        _pixmaps[key] = QPixmap.fromImage(
-            image.scaled(image.width() * scale, image.height() * scale)
-        )
+        mode = (Qt.TransformationMode.SmoothTransformation if scale < 1
+                else Qt.TransformationMode.FastTransformation)
+        _pixmaps[key] = QPixmap.fromImage(image.scaled(
+            round(image.width() * scale), round(image.height() * scale),
+            Qt.AspectRatioMode.IgnoreAspectRatio, mode))
     return _pixmaps[key]
 
 
@@ -223,10 +252,10 @@ def kitten_frame(sprites, kitten, number, now):
         animation = think_turn(kitten["think_count"], kitten["think_since"], now)
         if animation != "work":
             frames = sprites.ANIMATIONS[animation]
-            index = turn_index(animation, kitten["think_since"], now)
+            index = turn_index(sprites, animation, kitten["think_since"], now)
             return frames[index % len(frames)], overlays(sprites, animation, index)
     frames = sprites.ANIMATIONS["work"]
-    return frames[(int(now * FPS["work"]) + number) % len(frames)], []
+    return frames[(int(now * fps(sprites, "work")) + number) % len(frames)], []
 
 
 def describe_tool(tool, detail):
@@ -291,7 +320,7 @@ class Cat(QWidget):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
-        self.setFixedSize(WIDTH, HEIGHT)
+        self.setFixedSize(self.geo.width, self.geo.height)
         self.font_body = QFont()
         self.font_body.setPixelSize(12)
         self.font_title = QFont(self.font_body)
@@ -310,6 +339,8 @@ class Cat(QWidget):
         self.look = look if look in LOOKS else "cats"
         self.sprites = LOOKS[self.look]
         self.coat = self.sprites.COATS[self.coat_number % len(self.sprites.COATS)]
+        self.geo = GEOMETRY[self.look]
+        self.setFixedSize(self.geo.width, self.geo.height)
         self.signature = None
 
     def pick_look(self, look):
@@ -359,11 +390,11 @@ class Cat(QWidget):
             # The screen kept is the one active when the cat shows up.
             if not self.app.kwin_area and time.monotonic() - self.since < 1:
                 area = self.app.usable_area()
-                return QPointF(area.right() - 16 - (self.rank + 1) * WIDTH, area.bottom() - 4 - HEIGHT)
+                return QPointF(area.right() - 16 - (self.rank + 1) * self.geo.width, area.bottom() - 4 - self.geo.height)
             self.area = self.app.usable_area()
         return QPointF(
-            self.area.right() - 16 - (self.rank + 1) * WIDTH,
-            self.area.bottom() - 4 - HEIGHT,
+            self.area.right() - 16 - (self.rank + 1) * self.geo.width,
+            self.area.bottom() - 4 - self.geo.height,
         )
 
     def target(self):
@@ -371,12 +402,12 @@ class Cat(QWidget):
             mouse = self.app.mouse()
             order = self.app.follower_order(self)
             lines = self.bubble_lines()
-            top = self.bubble_rect(lines).top() if lines else CAT_TOP
-            x = mouse.x() + 18 + order * (CAT_W + 10)
+            top = self.bubble_rect(lines).top() if lines else self.geo.cat_top
+            x = mouse.x() + 18 + order * (self.geo.cat_w + 10)
             y = mouse.y() + 18 - top
             whole = QGuiApplication.primaryScreen().virtualGeometry()
-            x = min(max(x, whole.left()), whole.right() - WIDTH)
-            y = min(max(y, whole.top() - CAT_TOP), whole.bottom() - HEIGHT)
+            x = min(max(x, whole.left()), whole.right() - self.geo.width)
+            y = min(max(y, whole.top() - self.geo.cat_top), whole.bottom() - self.geo.height)
             return QPointF(x, y)
         return self.home_position()
 
@@ -436,7 +467,7 @@ class Cat(QWidget):
             [title_metrics.horizontalAdvance(lines[0])]
             + [metrics.horizontalAdvance(line) for line in lines[1:]]
         )
-        width = min(width + 16, WIDTH - 2)
+        width = min(width + 16, self.geo.width - 2)
         height = 8 + 16 * len(lines)
         return QRect(1, BUBBLE_H - 8 - height, width, height)
 
@@ -448,9 +479,9 @@ class Cat(QWidget):
             # Counted from the start of the turn: every series of crepes starts
             # with a throw, every yarn game with the ball in front of the cat,
             # every cube scrambled.
-            index = turn_index(animation, self.think_since, time.monotonic())
+            index = turn_index(self.sprites, animation, self.think_since, time.monotonic())
         else:
-            index = int(time.monotonic() * FPS[animation])
+            index = int(time.monotonic() * fps(self.sprites, animation))
         lines = self.bubble_lines()
         now = time.monotonic()
         signature = (
@@ -472,7 +503,7 @@ class Cat(QWidget):
         self.lines = lines
         # The window is drawn into a buffer, then masked with that drawing:
         # clicks pass through everything that is transparent.
-        buffer = QPixmap(WIDTH, HEIGHT)
+        buffer = QPixmap(self.geo.width, self.geo.height)
         buffer.fill(Qt.GlobalColor.transparent)
         painter = QPainter(buffer)
         self.paint(painter)
@@ -497,30 +528,35 @@ class Cat(QWidget):
         even = self.index % 2 == 0
 
         # The cat
-        sprites = self.sprites
-        image = pixmap(sprites, self.image, self.coat, self.activity, self.mirror, S)
+        sprites, geo = self.sprites, self.geo
+        scale = geo.scale
+        image = pixmap(sprites, self.image, self.coat, self.activity, self.mirror, scale)
         jump = 2 * S if (animation == "done" and even) else 0
-        x = (CAT_W - image.width()) // 2
-        y = HEIGHT - image.height() - jump
+        # Centered in its cell; a frame wider than the cell (the Reaper's
+        # beam) starts at its left edge, or ends at its right edge when mirrored.
+        x = (geo.cat_w - image.width()) // 2
+        if x < 0:
+            x = geo.cat_w - image.width() if self.mirror else 0
+        y = geo.height - image.height() - jump
         painter.drawPixmap(x, y, image)
 
         # The flying crepe, the yarn ball, the cube (thinking)
         for name, column, line, flipped in overlays(sprites, animation, self.index):
             width = len(sprites.IMAGES[name][0])
             if self.mirror:  # the cat looks the other way
-                column = (image.width() // S - 2) - column - width
+                column = (round(image.width() / scale) - 2) - column - width
                 flipped = not flipped
-            item = pixmap(sprites, name, self.coat, self.activity, flipped, S)
-            painter.drawPixmap(x + column * S, y + line * S, item)
+            item = pixmap(sprites, name, self.coat, self.activity, flipped, scale)
+            painter.drawPixmap(round(x + column * scale), round(y + line * scale), item)
 
         # The symbols above the cat
-        top = CAT_TOP
+        top = geo.cat_top
         if animation == "sleep":
-            self.draw_symbol(painter, "z", CAT_W - 5 * S, top + (3 if even else 2) * S, "#FFFFFF", S2)
+            self.draw_symbol(painter, "z", geo.cat_w - 5 * S, top + (3 if even else 2) * S, "#FFFFFF", S2)
             if even:
-                self.draw_symbol(painter, "z", CAT_W - 2 * S, top - S, "#FFFFFF", S2)
+                self.draw_symbol(painter, "z", geo.cat_w - 2 * S, top - S, "#FFFFFF", S2)
         elif animation == "question":
-            self.draw_symbol(painter, "?", CAT_W - 4 * S, top - (6 if even else 5) * S, "#E8590C", S)
+            self.draw_symbol(painter, "?", geo.cat_w - 4 * S, top - (6 if even else 5) * S, "#E8590C", S)
         elif animation == "done":
             for i, (sx, sy) in enumerate(((1, -4), (15, -6), (9, -7))):
                 if (self.index + i) % 3:
@@ -536,16 +572,17 @@ class Cat(QWidget):
         # front ones sit over them
         kittens = list(self.kittens.values())
         now = time.monotonic()
-        for i, x, row in reversed(kitten_places(len(kittens))):
+        for i, x, row in reversed(kitten_places(len(kittens), geo)):
             kitten = kittens[i]
             coat = pick(sprites.KITTEN_COATS, kitten["type"] or "agent")
             name, items = kitten_frame(sprites, kitten, i, now)
-            small = pixmap(sprites, name, coat, kitten["activity"], False, S2)
-            y = HEIGHT - small.height() - row * KITTEN_ROW_STEP
+            small_scale = geo.small
+            small = pixmap(sprites, name, coat, kitten["activity"], False, small_scale)
+            y = geo.height - small.height() - row * geo.row_step
             painter.drawPixmap(x, y, small)
             for item, column, line, flipped in items:  # crepe, yarn, cube, paws
-                item = pixmap(sprites, item, coat, kitten["activity"], flipped, S2)
-                painter.drawPixmap(x + column * S2, y + line * S2, item)
+                item = pixmap(sprites, item, coat, kitten["activity"], flipped, small_scale)
+                painter.drawPixmap(round(x + column * small_scale), round(y + line * small_scale), item)
 
         # The bubble
         if self.lines:

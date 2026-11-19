@@ -1,302 +1,109 @@
-"""Pixel art drawings of the Reapers theme ("theme": "reapers" in config.json).
+"""Drawings of the Reapers look ("Look" menu, or "theme": "reapers").
 
 Same names as sprites.py, so that cats.py and usage_cat.py draw them without
-knowing the theme: a Sovereign-class Reaper per Claude Code session, a small
+knowing the look: a Sovereign-class Reaper per Claude Code session, a small
 destroyer per running subagent.
 
-Every sprite is a list of text lines, one character per pixel:
+The Reaper is a pixel art animation (art/reaper.gif, see the README for its
+author), at its own size: one drawing pixel is one screen pixel (PIXEL is a
+quarter of a cat pixel). tools/make_reaper_frames.py turns the GIF into
+art/reaper-frames.png, its frames facing right; this module reads that strip
+with Qt and makes the variants on the fly:
 
-    .  transparent        K  outline
-    F  hull               S  hull seams (darker)
-    W  hull edge (lighter)
-    E  red glow (eyes, seam)  D  dimmed glow (asleep)
-    L  core glow (color depends on the activity)
-    N  small ship hull    B  engine and mass relay blue
-    H  hot beam core      R  beam
-    Q  Citadel hull       q  Citadel lights
+- the hull of each session (COATS): the steel blue of the animation turned
+  into bronze, rust, ash...;
+- working: the red lights take the color of the activity;
+- destroyers (KITTEN_COATS): their lights in the color of their agent type;
+- asleep: the frame darkened, lights dimmed.
 
-Front views are symmetric: they are written as their left half and mirrored.
-After editing a drawing, run `python3 sprites_reapers.py preview.png`.
+A drawing is (GIF frame number, effect): None, "glow" (lights in the color
+of the activity) or "dim" (asleep).
+
+Preview: python3 sprites_reapers.py preview.png
 """
 
+import colorsys
+import json
+import os
+
+from PyQt6.QtGui import QColor, QImage, QTransform
+
 import sprites
-from sprites import CELL_H, CELL_W  # noqa: F401  (same cell as the cats)
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+STRIP = os.path.join(HERE, "art", "reaper-frames.png")
+INDEX = os.path.join(HERE, "art", "reaper-frames.json")
+
+PIXEL = 0.25  # a drawing pixel is a quarter of a cat pixel: the Reaper at its own size
+# The cell of the Reaper's body (frames are wider: the beam and the
+# explosion go past it, on the right, over the room of the destroyers).
+CELL_W, CELL_H = 86, 151
+
+# Frames per second of each animation (the animation's own pace; cats.py
+# keeps its own for the other looks).
+FPS = {"idle": 8, "question": 8, "done": 8, "work": 8, "think": 10, "play": 10,
+       "cube": 10, "run": 14, "sleep": 1.5, "panic": 12}
 
 
-# --- Standing Reaper, seen from the side, facing right (16 lines) ----------
-# A long hull tilted up, its glow where the legs meet the hull, four legs.
-
-_HULL = [
-    "....KKK.............",
-    "...KWWFKK...........",
-    "...KWFFSFK..........",
-    "..KWFFSFFFK.........",
-    "..KWFSFFFSFK........",
-    "..KWFFSFFFSFK.......",
-    "..KWFFFSFFFSFK......",
-    "...KWFFSFFFSFEK.....",
-    "...KWFFFSFFFEEK.....",
-    "....KWFFFSFEEEK.....",
-    "...KKKFFFFFKEEKK....",
-]
-_HULL_MAW = _HULL[:7] + [  # the glow opens wide: the horn
-    "...KWFFSFFFSEEK.....",
-    "...KWFFFSFFEHEEK....",
-    "....KWFFFSEHHEK.....",
-    "...KKKFFFFKEEEKK....",
-]
+def _frames(first, last, effect=None):
+    return [f"g{n}" + (f"_{effect}" if effect else "") for n in range(first, last + 1)]
 
 
-def _hull(glow="E", core=None):
-    """The hull, its glow in another color (D asleep, L by activity), with a
-    hot core (H) or not."""
-    lines = [line.replace("E", glow) for line in _HULL]
-    if core:
-        lines[8] = lines[8][:13] + core + lines[8][14:]
-        lines[9] = lines[9][:12] + core + lines[9][13:]
-    return lines
-
-
-_LEGS_A = [
-    "...KFKKFKKFKKFK.....",
-    "..KFK.KFK.KFK.KFK...",
-    ".KFK..KFK.KFK..KFK..",
-    "KFK...KFK..KFK...KFK",
-    "KK....KK...KK.....KK",
-]
-_LEGS_B = [
-    "...KFKKFKKFKKFK.....",
-    "...KFK.KFKKFK.KFK...",
-    "..KFK..KFK.KFK.KFK..",
-    ".KFK...KFK.KFK..KFK.",
-    ".KK....KK...KK...KK.",
-]
-_LEGS_UP = [  # front leg raised
-    "...KFKKFKKFKKFKKFK..",
-    "..KFK.KFK.KFK..KFK..",
-    ".KFK..KFK.KFK.......",
-    "KFK...KFK..KFK......",
-    "KK....KK...KK.......",
-]
-
-# --- Flying, seen from the side: legs trailing behind (10 lines) ------------
-
-_RUN_A = [
-    "....................",
-    "KKKK..KKKKKKKKKK....",
-    "KFFFKKWWWWWWWWWWKK..",
-    ".KKKKEFFSFFFSFFFWWK.",
-    "KFFFKEEFFFSFFFSFFFFK",
-    ".KKKKEFFSFFFSFFFFKK.",
-    "KFFFKKKKKKKKKKKKK...",
-    "KKKK................",
-    "....................",
-    "....................",
-]
-_RUN_B = [
-    "....................",
-    ".KKK..KKKKKKKKKK....",
-    "KFFKKKWWWWWWWWWWKK..",
-    "KKKKKEFFSFFFSFFFWWK.",
-    ".KFFKEEFFFSFFFSFFFFK",
-    "KKKKKEFFSFFFSFFFFKK.",
-    "KFFKKKKKKKKKKKKKK...",
-    ".KKK................",
-    "....................",
-    "....................",
-]
-
-# --- Dormant in dark space: lying down, legs folded, glow dimmed (8 lines) --
-
-_SLEEP_A = [
-    "......KKKKKKKKK.....",
-    "...KKKWWWWWWWWWKK...",
-    ".KKWFFFSFFFSFFFFWK..",
-    "KWFFSFFFSFFFSFFFDK..",
-    "KFFFFSFFFSFFFFFDDK..",
-    ".KKKKKKKKKKKKKKKKKK.",
-    "..KFKKFK..KFKKFKKFK.",
-    "..KKKKKK..KKKKKKKKK.",
-]
-_SLEEP_B = [
-    "....................",
-    "......KKKKKKKKK.....",
-    "...KKKWWWWWWWWWKK...",
-    ".KKWFFFSFFFSFFFFWK..",
-    "KWFFSFFFSFFFSFFDDK..",
-    ".KKKKKKKKKKKKKKKKKK.",
-    "..KFKKFK..KFKKFKKFK.",
-    "..KKKKKK..KKKKKKKKK.",
-]
-
-# --- Thinking 1: the Reaper fires at a small ship, which dodges -------------
-
-_SHIP = ["..KKKK.", "KNNNNKB", ".KKKKK."]
-_BEAM = [  # from the glow up and forward, 12 lines
-    ".....RHR",
-    ".....RHR",
-    "....RHR.",
-    "....RHR.",
-    "...RHR..",
-    "...RHR..",
-    "..RHR...",
-    "..RHR...",
-    ".RHR....",
-    ".RHR....",
-    "RHR.....",
-    "RHR.....",
-]
-
-# --- Thinking 2: the Reaper charges a mass relay, which sends a streak ------
-
-_RELAY_A = [".KKKKKKK.", "KQQQQQQQK", ".KKBqBKK.", "KQQQQQQQK", ".KKKKKKK."]
-_RELAY_B = [".KKKKKKK.", "KQQQQQQQK", ".KKqBqKK.", "KQQQQQQQK", ".KKKKKKK."]
-_RELAY_FLASH = [".KKKKKKK.", "KQQQQQQQK", ".KKHHHKK.", "KQQQQQQQK", ".KKKKKKK."]
-_STREAK = ["qBBBBBHH"]
-_ZAP = ["RHR"] * 9  # the glow reaching up to the relay
-
-# --- Thinking 3: the Reaper closes the arms of the Citadel ------------------
-# Seen from the side: the ring at the bottom, five arms; from wide open to
-# closed, step by step.
-
-_CITADEL = [
-    [
-        "K...K...K",
-        "Q...Q...Q",
-        ".Q..Q..Q.",
-        "..Q.Q.Q..",
-        "...QQQ...",
-        "..KqqqK..",
-        "...KKK...",
-    ],
-    [
-        ".K..K..K.",
-        ".Q..Q..Q.",
-        "..Q.Q.Q..",
-        "..Q.Q.Q..",
-        "...QQQ...",
-        "..KqqqK..",
-        "...KKK...",
-    ],
-    [
-        "..K.K.K..",
-        "..Q.Q.Q..",
-        "..Q.Q.Q..",
-        "...QQQ...",
-        "...QQQ...",
-        "..KqqqK..",
-        "...KKK...",
-    ],
-    [
-        "...KKK...",
-        "...QQQ...",
-        "...QQQ...",
-        "...QQQ...",
-        "...QQQ...",
-        "..KqqqK..",
-        "...KKK...",
-    ],
-]
-
+_EFFECTS = (None, "glow", "dim")
 IMAGES = {
-    "sit_a": _hull() + _LEGS_A,
-    "sit_b": _hull() + _LEGS_B,
-    "sit_blink": _hull("D") + _LEGS_A,
-    "meow_a": _HULL_MAW + _LEGS_A,
-    "meow_b": _hull() + _LEGS_A,
-    "happy_a": _hull(core="H") + _LEGS_UP,
-    "happy_b": _hull(core="H") + _LEGS_B,
-    # Working: the glow takes the color of the activity, its core keeps the
-    # color of the Reaper (or of the destroyer, which tells its type).
-    "work_a": _hull("L", "E") + _LEGS_A,
-    "work_b": _hull("L", "E") + _LEGS_B,
-    "charge": _hull(core="H") + _LEGS_A,
-    "ship": _SHIP,
-    "beam": _BEAM,
-    "relay_a": _RELAY_A,
-    "relay_b": _RELAY_B,
-    "relay_flash": _RELAY_FLASH,
-    "streak": _STREAK,
-    "zap": _ZAP,
-    **{f"citadel_{n}": lines for n, lines in enumerate(_CITADEL)},
-    "run_a": _RUN_A,
-    "run_b": _RUN_B,
-    "sleep_a": _SLEEP_A,
-    "sleep_b": _SLEEP_B,
+    f"g{n}" + (f"_{effect}" if effect else ""): (n, effect)
+    for n in range(93) for effect in _EFFECTS
 }
 
-# Animations: sequences of sprites played in a loop. The three thinking games
-# last 16 frames (the length of a thinking turn in cats.py).
+# The sequences of the animation: swaying (0-21), the lights glowing (36-55),
+# the beam fired at the ground (56-65), the explosion (66-80).
 ANIMATIONS = {
-    "idle": ["sit_a"] * 4 + ["sit_b"] * 4 + ["sit_a"] * 3 + ["sit_blink"],
-    "question": ["meow_a", "meow_b"],
-    "done": ["happy_a", "happy_b"],
-    "work": ["work_a", "work_b"],
-    "think": ["sit_a", "sit_a", "charge", "charge", "sit_a", "sit_a", "sit_b", "sit_b"],
-    "play": ["sit_a"] * 3 + ["charge"] * 3 + ["sit_a"] * 6 + ["sit_b"] * 4,
-    "cube": ["charge", "sit_a"] * 6 + ["happy_b"] * 4,
-    "run": ["run_a", "run_b"],
-    "sleep": ["sleep_a"] * 3 + ["sleep_b"] * 3,
+    "idle": _frames(0, 21),
+    "question": _frames(44, 55),
+    "done": _frames(0, 21),
+    "work": _frames(36, 55, "glow"),
+    # Thinking, in turn (16 cat frames each, 3.2 seconds: 32 frames at 10 fps):
+    "think": _frames(56, 80) + _frames(0, 6),  # it fires at the ground
+    "play": _frames(36, 55) + _frames(0, 11),  # its lights charge up
+    "cube": _frames(0, 21) + _frames(0, 9),  # it sways
+    "run": _frames(0, 21),
+    "sleep": ["g0_dim", "g0_dim"],
 }
 
-# What is drawn over the Reaper, frame by frame of each thinking game, in
-# drawing order, as (sprite, column, line, mirrored); line < 0: above it.
-
-# The ship crosses from the front, the beam misses it.
-CREPE_FLIGHT = [
-    [("ship", 20, -6, False)],
-    [("ship", 17, -6, False)],
-    [("ship", 14, -5, False)],
-    [("ship", 11, -6, False), ("beam", 13, -3, False)],
-    [("ship", 8, -6, False)],
-    [("ship", 5, -5, False)],
-    [("ship", 2, -6, False)],
-    [],
-]
-
-_RELAY = (11, -6)
-YARN_PLAY = (
-    [[("relay_a" if k % 2 else "relay_b", *_RELAY, False)] for k in range(3)]
-    + [[("relay_b", *_RELAY, False), ("zap", 14, -1, False)] for _ in range(2)]
-    + [[("relay_flash", *_RELAY, False), ("zap", 14, -1, False)]]
-    + [[("relay_a", *_RELAY, False), ("streak", 21 + 5 * k, -4, False)] for k in range(4)]
-    + [[("relay_a" if k % 2 else "relay_b", *_RELAY, False)] for k in range(6)]
-)
-
-_CITADEL_AT = (14, 0)
-CUBE_SOLVE = [
-    [(f"citadel_{min(k // 3, 3)}", *_CITADEL_AT, False)] for k in range(12)
-] + [[("citadel_3", *_CITADEL_AT, False)]] * 4
+# Nothing is drawn over the Reaper: its animation says it all.
+CREPE_FLIGHT = [[]]
+YARN_PLAY = [[]]
+CUBE_SOLVE = [[]]
 
 SYMBOLS = sprites.SYMBOLS
 
 # --- Colors -----------------------------------------------------------------
 
-OUTLINE = "#14101A"
-# Pale red halo, to stay readable on a dark background.
-HALO = "#C8F2D6D0"
+OUTLINE = "#0E1018"
+HALO = "#70D0E0F0"  # a soft light edge, to stay readable on a dark background
 
-# Reaper hulls (one per Claude Code session).
+# Hulls (one per Claude Code session): hue (0-1, None: the animation's own
+# steel blue), saturation and brightness factors.
 COATS = [
-    {"name": "sovereign", "F": "#5E5A63", "S": "#3D3A44", "W": "#8E8794", "E": "#FF3B2F"},
-    {"name": "harbinger", "F": "#6B5847", "S": "#47392D", "W": "#9C8670", "E": "#FF4A2A"},
-    {"name": "obsidian", "F": "#3F3D4A", "S": "#2A2833", "W": "#6C6878", "E": "#FF2E4D"},
-    {"name": "rust", "F": "#7A4E3A", "S": "#553324", "W": "#A9735A", "E": "#FF5A1F"},
-    {"name": "ash", "F": "#7C7F86", "S": "#55585F", "W": "#A9ADB5", "E": "#FF3B2F"},
-    {"name": "bone", "F": "#9C9284", "S": "#6F675B", "W": "#C9BFAF", "E": "#E8341C"},
+    {"name": "sovereign", "hue": None, "sat": 1.0, "val": 1.0},
+    {"name": "harbinger", "hue": 0.08, "sat": 0.55, "val": 1.0},
+    {"name": "obsidian", "hue": 0.70, "sat": 0.25, "val": 0.72},
+    {"name": "rust", "hue": 0.04, "sat": 0.9, "val": 0.95},
+    {"name": "ash", "hue": None, "sat": 0.12, "val": 1.05},
+    {"name": "bone", "hue": 0.11, "sat": 0.28, "val": 1.15},
 ]
 
-# Destroyers (one per subagent type): same hull, lights of their own.
+# Destroyers (one per subagent type): the same hull, lights of their own.
 KITTEN_COATS = [
-    {"name": "crimson", "F": "#55525C", "S": "#38353F", "W": "#857F8C", "E": "#FF3B5C"},
-    {"name": "amber", "F": "#55525C", "S": "#38353F", "W": "#857F8C", "E": "#FFA62B"},
-    {"name": "violet", "F": "#55525C", "S": "#38353F", "W": "#857F8C", "E": "#B57BFF"},
-    {"name": "cyan", "F": "#55525C", "S": "#38353F", "W": "#857F8C", "E": "#3BD8FF"},
-    {"name": "acid", "F": "#55525C", "S": "#38353F", "W": "#857F8C", "E": "#A6FF3B"},
-    {"name": "ember", "F": "#55525C", "S": "#38353F", "W": "#857F8C", "E": "#FF6B3B"},
+    {"name": "crimson", "hue": None, "sat": 1.0, "val": 1.0, "lights": "#FF3B5C"},
+    {"name": "amber", "hue": None, "sat": 1.0, "val": 1.0, "lights": "#FFA62B"},
+    {"name": "violet", "hue": None, "sat": 1.0, "val": 1.0, "lights": "#B57BFF"},
+    {"name": "cyan", "hue": None, "sat": 1.0, "val": 1.0, "lights": "#3BD8FF"},
+    {"name": "acid", "hue": None, "sat": 1.0, "val": 1.0, "lights": "#A6FF3B"},
+    {"name": "ember", "hue": None, "sat": 1.0, "val": 1.0, "lights": "#FF6B3B"},
 ]
 
-# Core glow, depending on the activity.
+# Glow, depending on the activity (same colors as the laptop of the cats).
 SCREENS = {
     "think": "#FF6B5E",
     "write": "#7CE38B",
@@ -308,31 +115,107 @@ SCREENS = {
 
 
 def palette(coat, activity="think"):
-    """Character -> color table for a hull and an activity."""
-    return {
-        "K": OUTLINE,
-        "F": coat["F"],
-        "S": coat["S"],
-        "W": coat["W"],
-        "E": coat["E"],
-        "D": "#6E2A2A",
-        "L": SCREENS.get(activity, SCREENS["think"]),
-        "N": "#E6E9EE",
-        "B": "#4FC3FF",
-        "H": "#FFB09A",
-        "R": "#E8261C",
-        "Q": "#B9C3CF",
-        "q": "#7FD3FF",
-    }
+    """What draw() needs to make a variant: the hull and the colors of the lights."""
+    colors = dict(coat)
+    colors["L"] = SCREENS.get(activity, SCREENS["think"])
+    return colors
 
 
-def draw(lines, colors, mirror=False):
-    """Turn a list of lines into an image, one pixel per character."""
-    return sprites.draw(lines, colors, mirror, HALO)
+# --- Drawing ----------------------------------------------------------------
+
+_strip = None
+_index = None
+
+
+def _load():
+    global _strip, _index
+    if _strip is None:
+        _strip = QImage(STRIP).convertToFormat(QImage.Format.Format_ARGB32)
+        with open(INDEX, encoding="utf-8") as f:
+            _index = json.load(f)
+    return _strip, _index
+
+
+def _hue(color):
+    c = QColor(color)
+    return c.hueF() if c.hueF() >= 0 else 0.0
+
+
+def draw(entry, colors, mirror=False):
+    """A frame of the animation as an image, with its variant."""
+    number, effect = entry
+    strip, index = _load()
+    w, h = index["width"], index["height"]
+    frame = strip.copy(index["frames"][number] * w, 0, w, h)
+    hull_hue, sat, val = colors.get("hue"), colors.get("sat", 1.0), colors.get("val", 1.0)
+    lights = colors.get("L") if effect == "glow" else colors.get("lights")
+    light_hue = _hue(lights) if lights else None
+    out = QImage(w + 2, h + 2, QImage.Format.Format_ARGB32)
+    out.fill(0)
+    filled = []
+    plain = hull_hue is None and sat == 1.0 and val == 1.0 and light_hue is None and effect != "dim"
+    for y in range(h):
+        for x in range(w):
+            pixel = frame.pixel(x, y)
+            alpha = pixel >> 24 & 0xFF
+            if not alpha:
+                continue
+            filled.append((x + 1, y + 1))
+            if plain:
+                out.setPixel(x + 1, y + 1, pixel)
+                continue
+            r, g, b = (pixel >> 16 & 0xFF) / 255, (pixel >> 8 & 0xFF) / 255, (pixel & 0xFF) / 255
+            hh, s, v = colorsys.rgb_to_hsv(r, g, b)
+            light = s > 0.45 and v > 0.45 and (hh < 0.17 or hh > 0.9)
+            if light:
+                if effect == "dim":
+                    hh, s, v = 0.0, 0.6, v * 0.45
+                elif light_hue is not None:
+                    hh = light_hue
+            else:
+                if hull_hue is not None:
+                    hh = hull_hue
+                s = min(1.0, s * sat)
+                v = min(1.0, v * val * (0.5 if effect == "dim" else 1.0))
+            r, g, b = colorsys.hsv_to_rgb(hh, s, v)
+            out.setPixel(x + 1, y + 1, alpha << 24 | round(r * 255) << 16 | round(g * 255) << 8 | round(b * 255))
+    halo = QColor(HALO)
+    taken = set(filled)
+    for x, y in filled:
+        for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+            if (nx, ny) not in taken:
+                out.setPixelColor(nx, ny, halo)
+    if mirror:
+        out = out.transformed(QTransform().scale(-1, 1))
+    return out
 
 
 def check():
-    return sprites.check(IMAGES)
+    errors = []
+    for name in (n for frames in ANIMATIONS.values() for n in frames):
+        if name not in IMAGES:
+            errors.append(f"{name}: unknown frame")
+    return errors
+
+
+def _preview(path):
+    """One row per animation, a few frames of each, in several hulls."""
+    from PyQt6.QtGui import QGuiApplication, QPainter
+
+    app = QGuiApplication.instance() or QGuiApplication([])
+    rows = [(a, frames[:: max(1, len(frames) // 6)][:6]) for a, frames in ANIMATIONS.items()]
+    cw, ch = 182, 153
+    sheet = QImage(cw * 6, ch * len(rows), QImage.Format.Format_ARGB32)
+    sheet.fill(QColor("#1B2233"))
+    painter = QPainter(sheet)
+    for r, (animation, frames) in enumerate(rows):
+        for c, name in enumerate(frames):
+            coat = COATS[c % len(COATS)]
+            image = draw(IMAGES[name], palette(coat, "write"))
+            painter.drawImage(c * cw, r * ch, image)
+    painter.end()
+    sheet.save(path)
+    del app
 
 
 if __name__ == "__main__":
@@ -341,5 +224,5 @@ if __name__ == "__main__":
     for error in check():
         print("Warning:", error)
     if len(sys.argv) > 1:
-        sprites._preview(sys.argv[1], theme=sys.modules[__name__], background="#1B2233")
+        _preview(sys.argv[1])
         print("Sheet saved:", sys.argv[1])
