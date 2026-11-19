@@ -53,7 +53,8 @@ cube, each at its own pace.
 - Left click on the cat: it stops following the mouse and goes back home.
 - Drag the cat: drop it somewhere else, which becomes its new home.
 - Hover: shows the project name of a resting cat.
-- Right click: send the cat home, dismiss that cat, choose when the cats follow
+- Right click: send the cat home, dismiss that cat, turn it into a Reaper or back
+  (**Look**, see [Reapers theme](#reapers-theme)), choose when the cats follow
   the mouse, show or hide the usage cat (**Usage cat** checkbox, see
   [Hiding the usage cat](#hiding-the-usage-cat)), keep the usage cat only (see
   [Usage cat only](#usage-cat-only)), manage updates (see
@@ -135,7 +136,35 @@ an API key. No network call, no access to credentials: everything comes from
 what Claude Code hands to the status line. The texts are in French by default;
 set `"lang": "en"` for English.
 
-## Requirements
+## Reapers theme
+
+The cats can give way to Mass Effect style Reapers, in pixel art: add
+`"theme": "reapers"` to `config.json`, then close the program (right click on
+a cat); it starts again on the next event.
+
+![The Reapers in each of their states](demo-reapers.gif)
+
+Cats and Reapers can share the desktop: right click on a cat (or a Reaper),
+**Look**, then **Cat** or **Reaper**. The choice applies to its subagents and
+to every session open on the same project folder, and is remembered for that
+folder (`looks` in `config.json`). The `theme` setting gives the look of the
+other projects.
+
+- Each session gets a Sovereign-class Reaper, each with its own hull; each
+  running subagent gets a small destroyer, its lights in the color of its
+  agent type.
+- Working: the glow under the hull takes the color of the activity (same
+  colors as the laptop screen of the cats), its core keeps the color of the
+  Reaper.
+- Thinking, the Reaper takes turns: it fires its beam at a small ship, which
+  dodges; it charges a mass relay, which sends a streak away; it closes the
+  arms of the Citadel, one step at a time.
+- Question: the horn, the glow wide open. Task finished: it raises a leg, its
+  core burning bright. Asleep: dormant, lying down, glow dimmed. Moving: flies,
+  legs trailing behind.
+
+The usage cat follows the theme too: its glow shows the usage level.
+
 
 - Linux with a graphical session (Wayland or X11)
 - Python 3.9 or later
@@ -279,6 +308,12 @@ For the usage cat (which also follows `scale`):
 - `session_cats`: `false` to keep the usage cat only (also set from the menus).
 - `usage_cat`: `false` to hide the usage cat for good (also set from the menus);
   the status line keeps working.
+- `theme`: `cats` (default) or `reapers` (see [Reapers theme](#reapers-theme)):
+  the look of the projects without a look of their own.
+  With the Reapers, `coat` takes `sovereign`, `harbinger`, `obsidian`, `rust`,
+  `ash` or `bone`.
+- `looks`: look of each project folder, set from the **Look** menu
+  (`{"/path/of/project": "reapers"}`).
 
 ## How it works
 
@@ -292,7 +327,8 @@ For the usage cat (which also follows `scale`):
   itself fifteen seconds after the last cat is gone.
 - `kwin_cursor.js` is a KWin script loaded by `cats.py`. Under Wayland an
   application cannot read the mouse position: KWin reports it.
-- `sprites.py` holds the drawings and the colors.
+- `sprites.py` holds the drawings and the colors; `sprites_reapers.py` those
+  of the Reapers theme, and `theme.py` loads the module of the chosen theme.
 - `popup.py` opens the right-click menus and closes them on a click outside
   (the cats never take the focus, which keeps a plain menu from seeing that
   click under Wayland).
@@ -319,6 +355,8 @@ python3 sprites.py preview.png
 writes a sheet of every sprite to check the result.
 
 ![Every sprite, in cat and kitten coats](preview.png)
+
+For the Reapers theme: `python3 sprites_reapers.py preview-reapers.png`.
 
 ## Try it without Claude Code
 

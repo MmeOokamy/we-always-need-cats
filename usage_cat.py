@@ -44,9 +44,11 @@ from PyQt6.QtWidgets import QApplication, QMenu, QWidget
 
 import usage_common as common
 import popup
-import sprites
+import theme
 import updates
 from usage_common import LEVEL_COLOR, LEVELS, SETTINGS, TEXT
+
+sprites = theme.load()
 
 S = max(1, int(SETTINGS["scale"]))  # cat scale
 S2 = max(1, S // 2)  # scale of the small symbols

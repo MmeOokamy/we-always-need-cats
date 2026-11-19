@@ -55,7 +55,8 @@ et à son Rubik's cube, chacun à son rythme.
 - Clic gauche sur le chat : il arrête de suivre la souris et retourne à sa place.
 - Glisser le chat : le poser ailleurs, ce qui devient sa nouvelle place.
 - Survol : affiche le nom du projet d'un chat au repos.
-- Clic droit : remettre le chat à sa place, renvoyer ce chat, choisir quand les
+- Clic droit : remettre le chat à sa place, renvoyer ce chat, le changer en Reaper
+  ou inversement (**Look**, voir [Thème Reapers](#thème-reapers)), choisir quand les
   chats suivent la souris, afficher ou masquer le chat d'usage (case **Usage
   cat**, voir [Masquer le chat d'usage](#masquer-le-chat-dusage)), ne garder
   que le chat d'usage (voir [Chat d'usage seul](#chat-dusage-seul)), gérer les
@@ -141,7 +142,36 @@ Les limites d'usage n'existent qu'avec un abonnement Claude (Pro, Max, Team),
 pas avec une clé d'API. Aucun appel réseau, aucun accès aux identifiants : tout
 vient de ce que Claude Code transmet à la status line.
 
-## Pré-requis
+## Thème Reapers
+
+Les chats peuvent laisser la place à des Reapers façon Mass Effect, en pixel
+art : ajouter `"theme": "reapers"` dans `config.json`, puis fermer le
+programme (clic droit sur un chat) ; il redémarre au prochain événement.
+
+![Les Reapers dans chacun de leurs états](demo-reapers.gif)
+
+Chats et Reapers peuvent cohabiter : clic droit sur un chat (ou un Reaper),
+**Look**, puis **Cat** ou **Reaper**. Le choix vaut pour ses sous-agents et
+pour toutes les sessions ouvertes sur le même dossier de projet, et il est
+retenu pour ce dossier (`looks` dans `config.json`). Le réglage `theme` donne
+l'apparence des autres projets.
+
+- Un Reaper de classe Sovereign par session, chacun avec sa coque ; un petit
+  destroyer par sous-agent en cours d'exécution, ses feux de la couleur de son
+  type d'agent.
+- Au travail : la lueur sous la coque prend la couleur de l'activité (les
+  mêmes couleurs que l'écran de l'ordinateur des chats), son cœur garde la
+  couleur du Reaper.
+- Quand Claude réfléchit, le Reaper change d'occupation : il tire son rayon
+  sur un petit vaisseau, qui l'esquive ; il charge un relais cosmodésique, qui
+  envoie une traînée au loin ; il referme les bras de la Citadelle, étape par
+  étape.
+- Question : la corne, lueur grande ouverte. Tâche terminée : il lève une
+  patte, le cœur incandescent. Endormi : en dormance, couché, lueur éteinte.
+  En déplacement : il vole, les pattes traînant derrière lui.
+
+Le chat d'usage suit aussi le thème : sa lueur indique le niveau d'usage.
+
 
 - Linux avec une session graphique (Wayland ou X11)
 - Python 3.9 ou plus récent
@@ -290,6 +320,12 @@ Pour le chat d'usage (qui suit aussi `scale`) :
   par les menus).
 - `usage_cat` : `false` pour masquer le chat d'usage de façon permanente (se
   règle aussi par les menus) ; la status line reste active.
+- `theme` : `cats` (par défaut) ou `reapers` (voir
+  [Thème Reapers](#thème-reapers)) : apparence des projets qui n'en ont pas
+  reçu une par le menu. Avec les Reapers, `coat` prend
+  `sovereign`, `harbinger`, `obsidian`, `rust`, `ash` ou `bone`.
+- `looks` : apparence de chaque dossier de projet, choisie par le menu
+  **Look** (`{"/chemin/du/projet": "reapers"}`).
 
 ## Fonctionnement
 
@@ -303,7 +339,8 @@ Pour le chat d'usage (qui suit aussi `scale`) :
   s'arrête de lui-même quinze secondes après le départ du dernier chat.
 - `kwin_cursor.js` est un script KWin chargé par `cats.py`. Sous Wayland, une
   application ne peut pas lire la position de la souris : KWin la transmet.
-- `sprites.py` contient les dessins et les couleurs.
+- `sprites.py` contient les dessins et les couleurs ; `sprites_reapers.py`
+  ceux du thème Reapers, et `theme.py` charge le module du thème choisi.
 - `popup.py` ouvre les menus du clic droit et les ferme au clic à côté (les
   chats ne prennent jamais le focus, ce qui empêche un menu ordinaire de voir
   ce clic sous Wayland).
@@ -331,6 +368,8 @@ python3 sprites.py preview.png
 produit une planche de toutes les images pour contrôler le résultat.
 
 ![Toutes les images, en pelages de chats et de chatons](preview.png)
+
+Pour le thème Reapers : `python3 sprites_reapers.py preview-reapers.png`.
 
 ## Essayer sans Claude Code
 

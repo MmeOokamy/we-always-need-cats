@@ -16,6 +16,8 @@ Every sprite is a list of text lines, one character per pixel:
 After editing a drawing, run `python3 sprites.py preview.png` to see the result.
 """
 
+import sys
+
 from PyQt6.QtGui import QColor, QImage, QTransform
 
 # Size of the cell each sprite is placed in (bottom-aligned, centered).
@@ -440,7 +442,7 @@ def palette(coat, activity="think"):
     }
 
 
-def draw(lines, colors, mirror=False):
+def draw(lines, colors, mirror=False, halo=HALO):
     """Turn a list of lines into an image, one pixel per character."""
     width = max(len(line) for line in lines) + 2
     height = len(lines) + 2
@@ -452,7 +454,7 @@ def draw(lines, colors, mirror=False):
             if char in colors:
                 image.setPixelColor(x + 1, y + 1, QColor(colors[char]))
                 filled.add((x + 1, y + 1))
-    halo = QColor(HALO)
+    halo = QColor(halo)
     for x, y in filled:
         for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
             if (nx, ny) not in filled:
@@ -462,10 +464,10 @@ def draw(lines, colors, mirror=False):
     return image
 
 
-def check():
+def check(images=None):
     """Report inconsistent line lengths (helps while editing the drawings)."""
     errors = []
-    for name, lines in IMAGES.items():
+    for name, lines in (images or IMAGES).items():
         lengths = {len(line) for line in lines}
         if len(lengths) > 1:
             errors.append(f"{name}: lines of different lengths {sorted(lengths)}")
@@ -474,24 +476,26 @@ def check():
     return errors
 
 
-def _preview(path, zoom=8):
-    """Save a sheet of every sprite, for a visual check."""
+def _preview(path, zoom=8, theme=None, background="#6C8EAD"):
+    """Save a sheet of every sprite of a theme module (this one by default),
+    for a visual check."""
     from PyQt6.QtGui import QGuiApplication, QPainter
 
+    theme = theme or sys.modules[__name__]
     app = QGuiApplication.instance() or QGuiApplication([])
-    names = list(IMAGES)
+    names = list(theme.IMAGES)
     columns = 5
     rows = (len(names) + columns - 1) // columns
     margin = 2
     step_w, step_h = (CELL_W + margin) * zoom, (CELL_H + margin) * zoom
     sheet = QImage(columns * step_w, rows * step_h * 2, QImage.Format.Format_ARGB32)
-    sheet.fill(QColor("#6C8EAD"))
+    sheet.fill(QColor(background))
     painter = QPainter(sheet)
-    for band, coats in enumerate((COATS, KITTEN_COATS)):
+    for band, coats in enumerate((theme.COATS, theme.KITTEN_COATS)):
         for i, name in enumerate(names):
             coat = coats[i % len(coats)]
-            activity = list(SCREENS)[i % len(SCREENS)]
-            image = draw(IMAGES[name], palette(coat, activity))
+            activity = list(theme.SCREENS)[i % len(theme.SCREENS)]
+            image = theme.draw(theme.IMAGES[name], theme.palette(coat, activity))
             x = (i % columns) * step_w + (CELL_W - image.width()) // 2 * zoom + zoom
             y = (i // columns + band * rows) * step_h + (CELL_H - image.height()) * zoom + zoom
             painter.drawImage(x, y, image.scaled(image.width() * zoom, image.height() * zoom))
@@ -501,8 +505,6 @@ def _preview(path, zoom=8):
 
 
 if __name__ == "__main__":
-    import sys
-
     for error in check():
         print("Warning:", error)
     if len(sys.argv) > 1:

@@ -42,9 +42,14 @@ from PyQt6.QtGui import (
 from PyQt6.QtWidgets import QApplication, QMenu, QWidget
 
 import popup
-import sprites
+import theme
 import updates
 import usage_common
+
+sprites = theme.load()  # default look, and the size of the drawings
+# Every look (cats, Reapers), each session picks one (see Cat.set_look).
+LOOKS = {name: theme.load(name) for name in theme.THEMES}
+LOOK_LABELS = {"cats": "Cat", "reapers": "Reaper"}
 
 APP_NAME = "we-always-need-cats"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -68,6 +73,7 @@ SETTINGS = {
     "sleep_delay": 180,  # seconds of idling before the cat falls asleep
     "speed": 800,  # running speed, in pixels per second
     "log": False,  # write received events to ~/.cache/we-always-need-cats/cats.log
+    "looks": {},  # project folder -> look picked from the menu ("cats", "reapers")
 }
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 try:
@@ -134,7 +140,6 @@ FPS = {"idle": 3, "question": 3, "done": 4, "work": 4, "think": 5, "play": 5, "c
 THINK_PERIOD = 2 * len(sprites.ANIMATIONS["think"]) / FPS["think"]  # seconds
 THINK_TURNS = ("work", "think", "play", "cube")  # laptop, crepes, yarn, cube
 # What is drawn over the cat, frame by frame, in each turn but the laptop.
-OVERLAYS = {"play": sprites.YARN_PLAY, "cube": sprites.CUBE_SOLVE}
 
 
 def think_turn(count, since, now):
@@ -147,14 +152,16 @@ def turn_index(animation, since, now):
     return int(((now - since) % THINK_PERIOD) * FPS[animation])
 
 
-def overlays(animation, index):
+def overlays(sprites, animation, index):
     """What is drawn over a cat for this frame: the flying crepe, the yarn
     ball and the raised paw, or the cube and the paws holding it, as
     [(sprite, column, line, mirrored)]."""
     if animation == "think":
         flight = sprites.CREPE_FLIGHT[index % len(sprites.CREPE_FLIGHT)]
+        if isinstance(flight, list):  # several items (Reapers theme)
+            return flight
         return [flight] if flight else []
-    frames = OVERLAYS.get(animation)
+    frames = {"play": sprites.YARN_PLAY, "cube": sprites.CUBE_SOLVE}.get(animation)
     return frames[index % len(frames)] if frames else []
 
 
@@ -180,8 +187,8 @@ def pick(items, key):
 _pixmaps = {}
 
 
-def pixmap(name, coat, activity, mirror, scale):
-    key = (name, coat["name"], activity, mirror, scale)
+def pixmap(sprites, name, coat, activity, mirror, scale):
+    key = (sprites.__name__, name, coat["name"], activity, mirror, scale)
     if key not in _pixmaps:
         image = sprites.draw(sprites.IMAGES[name], sprites.palette(coat, activity), mirror)
         _pixmaps[key] = QPixmap.fromImage(
@@ -208,7 +215,7 @@ def set_kitten_activity(kitten, activity):
     kitten["activity"] = activity
 
 
-def kitten_frame(kitten, number, now):
+def kitten_frame(sprites, kitten, number, now):
     """(sprite, what is drawn over it) of a kitten: like the cat, a thinking
     kitten swaps its laptop for a frying pan, a ball of yarn or a Rubik's cube
     now and then."""
@@ -217,7 +224,7 @@ def kitten_frame(kitten, number, now):
         if animation != "work":
             frames = sprites.ANIMATIONS[animation]
             index = turn_index(animation, kitten["think_since"], now)
-            return frames[index % len(frames)], overlays(animation, index)
+            return frames[index % len(frames)], overlays(sprites, animation, index)
     frames = sprites.ANIMATIONS["work"]
     return frames[(int(now * FPS["work"]) + number) % len(frames)], []
 
@@ -247,13 +254,15 @@ def describe_tool(tool, detail):
 class Cat(QWidget):
     """Window of one cat: one Claude Code session."""
 
-    def __init__(self, app, session, rank, coat):
+    def __init__(self, app, session, rank, coat_number):
         super().__init__()
         self.app = app
         self.session = session
         self.rank = rank
-        self.coat = coat
+        self.coat_number = coat_number  # same rank of coat in every look
+        self.set_look(theme.name())
         self.project = ""
+        self.cwd = ""
         self.pid = 0
         self.state = "idle"  # idle, sleep, work, question, done
         self.text = ""
@@ -293,6 +302,27 @@ class Cat(QWidget):
         self.move(int(self.px), int(self.py))
         self.refresh(force=True)
         self.show()
+
+    # --- Look ---------------------------------------------------------------
+
+    def set_look(self, look):
+        """Cat or Reaper (see LOOKS); its kittens take the same look."""
+        self.look = look if look in LOOKS else "cats"
+        self.sprites = LOOKS[self.look]
+        self.coat = self.sprites.COATS[self.coat_number % len(self.sprites.COATS)]
+        self.signature = None
+
+    def pick_look(self, look):
+        """Look chosen from the menu: remembered for the project, applied to
+        every session open on it."""
+        if self.cwd:
+            looks = dict(SETTINGS.get("looks") or {})
+            looks[self.cwd] = look
+            save_setting("looks", looks)
+        for cat in self.app.cats.values():
+            if cat is self or (self.cwd and cat.cwd == self.cwd):
+                cat.set_look(look)
+                cat.refresh(force=True)
 
     # --- State --------------------------------------------------------------
 
@@ -413,7 +443,7 @@ class Cat(QWidget):
     def refresh(self, force=False):
         """Redraw the window when what it shows has changed."""
         animation = self.animation()
-        frames = sprites.ANIMATIONS[animation]
+        frames = self.sprites.ANIMATIONS[animation]
         if animation in THINK_TURNS:
             # Counted from the start of the turn: every series of crepes starts
             # with a throw, every yarn game with the ball in front of the cat,
@@ -430,7 +460,7 @@ class Cat(QWidget):
             self.activity,
             tuple(lines),
             tuple(
-                (k["type"], k["activity"], kitten_frame(k, i, now))
+                (k["type"], k["activity"], kitten_frame(self.sprites, k, i, now))
                 for i, k in enumerate(self.kittens.values())
             ),
         )
@@ -467,19 +497,20 @@ class Cat(QWidget):
         even = self.index % 2 == 0
 
         # The cat
-        image = pixmap(self.image, self.coat, self.activity, self.mirror, S)
+        sprites = self.sprites
+        image = pixmap(sprites, self.image, self.coat, self.activity, self.mirror, S)
         jump = 2 * S if (animation == "done" and even) else 0
         x = (CAT_W - image.width()) // 2
         y = HEIGHT - image.height() - jump
         painter.drawPixmap(x, y, image)
 
         # The flying crepe, the yarn ball, the cube (thinking)
-        for name, column, line, flipped in overlays(animation, self.index):
+        for name, column, line, flipped in overlays(sprites, animation, self.index):
             width = len(sprites.IMAGES[name][0])
             if self.mirror:  # the cat looks the other way
                 column = (image.width() // S - 2) - column - width
                 flipped = not flipped
-            item = pixmap(name, self.coat, self.activity, flipped, S)
+            item = pixmap(sprites, name, self.coat, self.activity, flipped, S)
             painter.drawPixmap(x + column * S, y + line * S, item)
 
         # The symbols above the cat
@@ -508,12 +539,12 @@ class Cat(QWidget):
         for i, x, row in reversed(kitten_places(len(kittens))):
             kitten = kittens[i]
             coat = pick(sprites.KITTEN_COATS, kitten["type"] or "agent")
-            name, items = kitten_frame(kitten, i, now)
-            small = pixmap(name, coat, kitten["activity"], False, S2)
+            name, items = kitten_frame(sprites, kitten, i, now)
+            small = pixmap(sprites, name, coat, kitten["activity"], False, S2)
             y = HEIGHT - small.height() - row * KITTEN_ROW_STEP
             painter.drawPixmap(x, y, small)
             for item, column, line, flipped in items:  # crepe, yarn, cube, paws
-                item = pixmap(item, coat, kitten["activity"], flipped, S2)
+                item = pixmap(sprites, item, coat, kitten["activity"], flipped, S2)
                 painter.drawPixmap(x + column * S2, y + line * S2, item)
 
         # The bubble
@@ -582,6 +613,13 @@ class Cat(QWidget):
         menu = QMenu()
         menu.addAction("Send this cat home", self.reset_home)
         menu.addAction("Dismiss this cat", lambda: self.app.remove(self.session))
+        menu.addSeparator()
+        looks = menu.addMenu("Look")
+        for look, label in LOOK_LABELS.items():
+            action = looks.addAction(label)
+            action.setCheckable(True)
+            action.setChecked(look == self.look)
+            action.triggered.connect(lambda _checked, look=look: self.pick_look(look))
         menu.addSeparator()
         follow = menu.addMenu("Follow the mouse")
         for state, label in (
@@ -775,10 +813,11 @@ class App(QObject):
         if cat is None:
             ranks = {c.rank for c in self.cats.values()}
             rank = next(i for i in range(len(ranks) + 1) if i not in ranks)
-            taken = {c.coat["name"] for c in self.cats.values()}
-            free = [c for c in sprites.COATS if c["name"] not in taken]
-            coat = free[0] if free else pick(sprites.COATS, session)
-            cat = Cat(self, session, rank, coat)
+            taken = {c.coat_number for c in self.cats.values()}
+            count = len(sprites.COATS)
+            free = [n for n in range(count) if n not in taken]
+            number = free[0] if free else zlib.crc32(session.encode()) % count
+            cat = Cat(self, session, rank, number)
             self.cats[session] = cat
         return cat
 
@@ -808,6 +847,9 @@ class App(QObject):
         agent = m.get("agent_id", "")
         if m.get("cwd") and not agent and (not cat.project or event == "SessionStart"):
             cat.project = os.path.basename(m["cwd"].rstrip("/")) or m["cwd"]
+            if m["cwd"] != cat.cwd:
+                cat.cwd = m["cwd"]
+                cat.set_look((SETTINGS.get("looks") or {}).get(cat.cwd, theme.name()))
         tool = m.get("tool", "")
 
         if event == "SubagentStart":
